@@ -1,0 +1,23 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+transformers = "*"
+datasets = "*"
+tokenizers = "*"
+more-itertools = "*"
+tensorboard = "*"
+gputil = "*"
+hyperopt = "*"
+isort = "*"
+
+[dev-packages]
+
+[requires]
+python_version = "3.8"
+
+[packages.ray]
+extras = [ "tune",]
+version = "*"
