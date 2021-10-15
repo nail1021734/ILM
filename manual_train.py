@@ -8,12 +8,13 @@ from train_script import train
 if __name__ == '__main__':
     train_config = {
         'max_length': 512,
-        'tokenizer_name': 'chinese_tokenizer',
-        'dataset_size': 40000,
+        'tokenizer_name': 'chinese_tokenizer_big',
+        'dataset_size': 1089687,
         'save_ckpt_step': 10000,
         'log_step': 500,
         'padding_idx': 0,
-        'exp_name': 'test'
+        'exp_name': 'MLM_exp3',
+        'task': 'MLM'
     }
     model_config = GPT2Config(
         vocab_size=50000,
@@ -26,11 +27,12 @@ if __name__ == '__main__':
     )
     hp_config = {
         'seed': 22,
-        'lr': 1e-4,
-        'epoch_num': 10,
-        'batch_size': 4,
+        'lr': 2e-4,
+        'epoch_num': 5,
+        'batch_size': 8,
         'accumulate_step': 40,
-        'warm_up_step_rate': 0.02
+        'warm_up_step_rate': 0.02,
+        'weight_decay': 0.02
     }
     save_path = os.path.join('checkpoint', train_config['exp_name'])
     train(

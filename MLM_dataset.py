@@ -1,7 +1,7 @@
 import os
 import sqlite3
 from datetime import datetime as dt
-
+import pickle
 import datasets
 
 logger = datasets.logging.get_logger(__name__)
@@ -10,8 +10,8 @@ _DESCRIPTION = """
 Collect Taiwan news from about 10 news media.
 """
 
-_TRAIN_PATH = os.path.join('dataset', 'ettoday_train.db')
-_TEST_PATH = os.path.join('dataset', 'ettoday_test.db')
+_TRAIN_PATH = os.path.join('dataset', 'mlm_train.pk')
+_TEST_PATH = os.path.join('dataset', 'mlm_test.pk')
 
 COMPANY_DICT = {
     1: 'chinatimes',
@@ -27,23 +27,23 @@ COMPANY_DICT = {
     11: 'udn',
 }
 
-class TaiwanNewsConfig(datasets.BuilderConfig):
+class MLMConfig(datasets.BuilderConfig):
     def __init__(self, **kwargs):
         r"""BuilderConfig for TaiwanNewsDataset.
 
         Args:
             **kwargs: keyword arguments forwarded to super.
         """
-        super(TaiwanNewsConfig, self).__init__(**kwargs)
+        super(MLMConfig, self).__init__(**kwargs)
 
 
-class TaiwanNewsDataset(datasets.GeneratorBasedBuilder):
+class MLMDataset(datasets.GeneratorBasedBuilder):
     r"""Collect Taiwan news from about 10 news media."""
     BUILDER_CONFIG = [
-        TaiwanNewsConfig(
-            name='news_text',
+        MLMConfig(
+            name='mlm_news_text',
             version=datasets.Version('1.0.0', ''),
-            description='news text'
+            description='mlm news text'
         ),
     ]
 
@@ -59,6 +59,8 @@ class TaiwanNewsDataset(datasets.GeneratorBasedBuilder):
                     'datetime': datasets.Value('string'),
                     'category': datasets.Value('string'),
                     'company': datasets.Value('string'),
+                    'masked_article': datasets.Value('string'),
+                    'answer': datasets.Value('string'),
                 }
             ),
             supervised_keys=None,
@@ -73,34 +75,28 @@ class TaiwanNewsDataset(datasets.GeneratorBasedBuilder):
         ]
 
     def _generate_examples(self, filepath):
-        # Connect to DB.
-        conn = sqlite3.connect(filepath)
-
-        # Set `conn.row_factory` to get right return format.
-        # conn.row_factory = lambda cursor, row: row[0]
-
-        # Get database cursor.
-        cursor = conn.cursor()
-
-        sql = """
-        SELECT id, datetime, company_id, category, reporter, title, article from news;
-        """
+        dataset = pickle.load(open(filepath, 'rb'))
         key = 0
-        for (
-            idx, datetime, company_id, category, reporter, title, article
-        ) in cursor.execute(sql):
-            if not (datetime and category and reporter and title and article):
+        for data_dict in dataset:
+            if not (data_dict['datetime'] and
+                    data_dict['category'] and
+                    data_dict['reporter'] and
+                    data_dict['title'] and
+                    data_dict['article']
+            ):
                 continue
             yield (
                 key,
                 {
-                    'id': idx,
-                    'datetime': dt.fromtimestamp(datetime).strftime('%Y-%d-%m'),
-                    'company': COMPANY_DICT[company_id],
-                    'category': category,
-                    'reporter': reporter,
-                    'title': title,
-                    'article': article,
+                    'id': data_dict['id'],
+                    'datetime': data_dict['datetime'],
+                    'company': data_dict['company'],
+                    'category': data_dict['category'],
+                    'reporter': data_dict['reporter'],
+                    'title': data_dict['title'],
+                    'article': data_dict['article'],
+                    'masked_article': data_dict['masked_article'],
+                    'answer': data_dict['answer'],
                 }
             )
             key += 1

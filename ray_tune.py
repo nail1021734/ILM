@@ -10,11 +10,12 @@ from train_script import train
 if __name__ == '__main__':
     train_config = {
         'max_length': 512,
-        'tokenizer_name': 'chinese_tokenizer',
+        'tokenizer_name': 'chinese_tokenizer_big',
         'dataset_size': 40000,
         'save_ckpt_step': 10000,
         'log_step': 500,
-        'padding_idx': 0
+        'padding_idx': 0,
+        'task': 'MLM'
     }
     model_config = GPT2Config(
         vocab_size=50000,
@@ -29,12 +30,13 @@ if __name__ == '__main__':
         metric='loss', mode='min'
     )
     hp_config = {
-        'seed': tune.choice(list(range(0, 41))),
+        'seed': 42,
         'lr': tune.uniform(3e-5, 3e-4),
-        'epoch_num': 10,
-        'batch_size': 4,
-        'accumulate_step': tune.choice([20, 30, 40]),
-        'warm_up_step_rate': tune.uniform(0.01, 0.05)
+        'epoch_num': 3,
+        'batch_size': 8,
+        'accumulate_step': tune.choice([20, 30, 40, 50]),
+        'warm_up_step_rate': tune.uniform(0.01, 0.1),
+        'weight_decay': tune.uniform(0.01, 0.05)
     }
 
     tune.run(
@@ -42,8 +44,8 @@ if __name__ == '__main__':
                 data_loader_creater=create_data_loader),
         name='test',
         config=hp_config,
-        num_samples=10,
-        local_dir='epoch10',
+        num_samples=5,
+        local_dir='MLMtest',
         search_alg=hyperopt_search,
         resources_per_trial={
             'gpu': 1

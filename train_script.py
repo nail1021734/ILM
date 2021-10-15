@@ -57,6 +57,7 @@ def train(
     train_config=None,
     model_config=None,
     data_loader_creater=None,
+    # Input `save_path` represent choose manual training.
     save_path=None,
     progress_bar=False,
 ):
@@ -92,7 +93,8 @@ def train(
     data_loader = data_loader_creater(
         batch_size=hp_config.batch_size,
         tokenizer_name=train_config.tokenizer_name,
-        max_length=train_config.max_length
+        max_length=train_config.max_length,
+        training_mode=train_config.task
     )
 
     # Initial model.
@@ -100,7 +102,11 @@ def train(
     model = model.to(device)
 
     # Initial optimizer.
-    optimizer = torch.optim.AdamW(model.parameters(), lr=hp_config.lr)
+    optimizer = torch.optim.AdamW(
+        model.parameters(),
+        lr=hp_config.lr,
+        weight_decay=hp_config.weight_decay
+    )
     warm_up_function = create_warm_up_function(
         train_config=train_config,
         hp_config=hp_config
@@ -117,17 +123,37 @@ def train(
                 data_loader,
                 desc=f'epoch: {epoch}, loss: {0:.6f}'
             )
-        for batch_inputs in data_loader:
+        else :
+            epoch_iter = data_loader
+        for batch_inputs in epoch_iter:
             batch_inputs['input_ids'] = batch_inputs['input_ids'].to(device)
             batch_inputs['attention_mask'] = batch_inputs['attention_mask'].to(
                 device)
-            outputs = model(**batch_inputs)
+            outputs = model(
+                input_ids=batch_inputs['input_ids'],
+                attention_mask=batch_inputs['attention_mask']
+            )
 
-            # Calaulate loss.
-            shift_logits = outputs.logits[..., :-1, :].contiguous()
-            shift_labels = batch_inputs['input_ids'][..., 1:].contiguous()
-            # Flatten the tokens
-            loss = criterion(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
+            if train_config.task == 'GPT':
+                # Calaulate loss.
+                shift_logits = outputs.logits[..., :-1, :].contiguous()
+                shift_labels = batch_inputs['input_ids'][..., 1:].contiguous()
+                # Flatten the tokens
+                loss = criterion(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
+            elif train_config.task == 'MLM':
+                # Calaulate loss.
+                shift_logits = outputs.logits[..., :-1, :].contiguous()
+
+                # Start from second word.
+                mask = batch_inputs['answer_mask'][..., 1:].to(device)
+                padding_id = torch.zeros_like(mask) + train_config.padding_idx
+                padding_id = padding_id * (mask==False)
+                padding_id = padding_id.to(device)
+                shift_labels = batch_inputs['input_ids'][..., 1:].contiguous() * mask + padding_id
+
+                # Flatten the tokens
+                loss = criterion(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
+
             total_loss += loss.item()
 
             # Modify progress bar.
@@ -147,8 +173,9 @@ def train(
                 # Update tensorboard.
                 avg_loss = total_loss / train_config.log_step
                 writer.add_scalar('loss', avg_loss, iteration)
-                tune.report(loss=avg_loss)
                 total_loss = 0
+                if not save_path:
+                    tune.report(loss=avg_loss)
 
             if iteration % train_config.save_ckpt_step == 0:
                 save_model(

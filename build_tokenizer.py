@@ -40,7 +40,7 @@ def build_BPE_tokenizer(tokenizer_name: str, dataset: List[str], vocab_size: int
     # Training tokenizer.
     tokenizer.train_from_iterator(corpus, trainer=trainer)
 
-    # # Set post_precessor.
+    # Set post_precessor.
     # tokenizer.post_processor = TemplateProcessing(
     #     single="[TITLE] $A [END]",
     #     pair="[TITLE] $A [ARTICLE] $B [END]",

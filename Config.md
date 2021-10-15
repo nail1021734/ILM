@@ -9,6 +9,7 @@
 - padding_idx
 - log_step
 - exp_name
+- task
 
 ## hp_config
 
