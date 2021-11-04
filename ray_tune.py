@@ -1,22 +1,26 @@
 from functools import partial
 
+from ray import tune
 from ray.tune.suggest.hyperopt import HyperOptSearch
 from transformers import GPT2Config
 
-from data_processor import create_data_loader
-from ray import tune
-from train_script import train
+from utils.config import build_training_config
+from utils.data_processor import create_data_loader
+from utils.train_script import train
 
 if __name__ == '__main__':
-    train_config = {
-        'max_length': 512,
-        'tokenizer_name': 'chinese_tokenizer_big',
-        'dataset_size': 40000,
-        'save_ckpt_step': 10000,
-        'log_step': 500,
-        'padding_idx': 0,
-        'task': 'MLM'
-    }
+    # Create training config.
+    train_config = build_training_config(
+        max_length= 512,
+        tokenizer_name='chinese_tokenizer_big',
+        save_ckpt_step=50000,
+        log_step=500,
+        exp_name='MLM_exp4',
+        task='MLM',
+        dataset_name='MLM_dataset_v2',
+        ray=True
+    )
+    # Create model config.
     model_config = GPT2Config(
         vocab_size=50000,
         n_positions=512,
@@ -29,6 +33,7 @@ if __name__ == '__main__':
     hyperopt_search = HyperOptSearch(
         metric='loss', mode='min'
     )
+    # Create hyperparameter config.
     hp_config = {
         'seed': 42,
         'lr': tune.uniform(3e-5, 3e-4),

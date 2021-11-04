@@ -5,6 +5,7 @@ from datasets import load_dataset
 from more_itertools import chunked
 from tokenizers import (Tokenizer, decoders, models, normalizers,
                         pre_tokenizers, trainers)
+from _path import ROOT_PATH
 
 
 def build_BPE_tokenizer(tokenizer_name: str, dataset: List[str], vocab_size: int):
@@ -16,20 +17,20 @@ def build_BPE_tokenizer(tokenizer_name: str, dataset: List[str], vocab_size: int
 
     # Set special tokens.
     special_tokens_list = ["[PAD]", "<unk>", "[CLS]", "[SEP]", "[MASK]",
-    "[TITLE]", "[ARTICLE]", "[REF]", "[END]", "<en>", "<num>",
-    "[COMPANY]", "[REPORTER]", "[DATETIME]", "[CATEGORY]"]
-    special_tokens_list.extend([f'<per{i}>' for i in range(30)])
-    special_tokens_list.extend([f'<org{i}>' for i in range(30)])
-    special_tokens_list.extend([f'<loc{i}>' for i in range(30)])
+                           "[TITLE]", "[ARTICLE]", "[REF]", "[END]", "<en>", "<num>",
+                           "[COMPANY]", "[REPORTER]", "[DATETIME]", "[CATEGORY]"]
+    # special_tokens_list.extend([f'<per{i}>' for i in range(30)])
+    # special_tokens_list.extend([f'<org{i}>' for i in range(30)])
+    # special_tokens_list.extend([f'<loc{i}>' for i in range(30)])
 
     # Create batches of data.
     corpus = chunked((
-            f'[COMPANY]{i["company"]}' +
-            f'[REPORTER]{i["reporter"]}'+
-            f'[DATETIME]{i["datetime"]}'+
-            f'[CATEGORY]{i["category"]}'+
-            f'[TITLE]{i["title"]}'+
-            f'[ARTICLE]{i["article"]}[END]' for i in dataset['train']), 1000)
+        f'[COMPANY]{i["company"]}' +
+        f'[REPORTER]{i["reporter"]}' +
+        f'[DATETIME]{i["datetime"]}' +
+        f'[CATEGORY]{i["category"]}' +
+        f'[TITLE]{i["title"]}' +
+        f'[ARTICLE]{i["article"]}[END]' for i in dataset['train']), 1000)
 
     # Set trainer.
     trainer = trainers.BpeTrainer(
@@ -56,13 +57,14 @@ def build_BPE_tokenizer(tokenizer_name: str, dataset: List[str], vocab_size: int
         os.makedirs('tokenizer')
 
     # Save in directory.
-    tokenizer.save(os.path.join('tokenizer', f'{tokenizer_name}.json'))
+    tokenizer.save(os.path.join(
+        ROOT_PATH, 'tokenizer', f'{tokenizer_name}.json'))
 
 
 if __name__ == '__main__':
-    dataset = load_dataset('Taiwan_news_dataset.py')
+    dataset = load_dataset('dataset_script/Taiwan_news_dataset_notag.py')
     build_BPE_tokenizer(
-        tokenizer_name='chinese_tokenizer_big',
+        tokenizer_name='chinese_tokenizer_big_NT',
         dataset=dataset,
         vocab_size=50000,
     )

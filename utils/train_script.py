@@ -5,12 +5,11 @@ from argparse import Namespace
 
 import numpy as np
 import torch
+from ray import tune
 from torch.nn import CrossEntropyLoss
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 from transformers import GPT2LMHeadModel
-
-from ray import tune
 
 
 def save_model(model, optimizer, save_path, iteration):
@@ -57,18 +56,16 @@ def train(
     train_config=None,
     model_config=None,
     data_loader_creater=None,
-    # Input `save_path` represent choose manual training.
-    save_path=None,
     progress_bar=False,
 ):
-    # tune.utils.wait_for_gpu()
     # Get save path.
-    if not save_path:
+    if not train_config['save_path']:
         save_dir = tune.get_trial_dir()
     else:
-        save_dir = save_path
+        save_dir = train_config['save_path']
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
+
     # Save experiment config.
     save_config(
         train_config=train_config,
@@ -91,6 +88,7 @@ def train(
 
     # Get data loader.
     data_loader = data_loader_creater(
+        dataset_name=train_config.dataset_name,
         batch_size=hp_config.batch_size,
         tokenizer_name=train_config.tokenizer_name,
         max_length=train_config.max_length,
@@ -101,12 +99,31 @@ def train(
     model = GPT2LMHeadModel(model_config)
     model = model.to(device)
 
+    # Set bias and LayerNorm no weight dacay.
+    no_decay = ['bias', 'ln']
+    optim_group_params = [
+        {
+            'params': [
+                param for name, param in model.named_parameters()
+                if not any(nd in name for nd in no_decay)
+            ],
+            'weight_decay': hp_config.weight_decay,
+        },
+        {
+            'params': [
+                param for name, param in model.named_parameters()
+                if any(nd in name for nd in no_decay)
+            ],
+            'weight_decay': 0.0,
+        },
+    ]
+
     # Initial optimizer.
     optimizer = torch.optim.AdamW(
-        model.parameters(),
+        optim_group_params,
         lr=hp_config.lr,
-        weight_decay=hp_config.weight_decay
     )
+
     warm_up_function = create_warm_up_function(
         train_config=train_config,
         hp_config=hp_config
@@ -123,8 +140,9 @@ def train(
                 data_loader,
                 desc=f'epoch: {epoch}, loss: {0:.6f}'
             )
-        else :
+        else:
             epoch_iter = data_loader
+
         for batch_inputs in epoch_iter:
             batch_inputs['input_ids'] = batch_inputs['input_ids'].to(device)
             batch_inputs['attention_mask'] = batch_inputs['attention_mask'].to(
@@ -134,12 +152,16 @@ def train(
                 attention_mask=batch_inputs['attention_mask']
             )
 
-            if train_config.task == 'GPT':
-                # Calaulate loss.
-                shift_logits = outputs.logits[..., :-1, :].contiguous()
-                shift_labels = batch_inputs['input_ids'][..., 1:].contiguous()
+            if train_config.task == 'LM':
+                # Calaulate loss.(跳過100個token當作prefix)
+                shift_logits = outputs.logits[..., 100:-1, :].contiguous()
+                shift_labels = batch_inputs['input_ids'][..., 101:].contiguous(
+                )
                 # Flatten the tokens
-                loss = criterion(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
+                loss = criterion(
+                    shift_logits.view(-1, shift_logits.size(-1)),
+                    shift_labels.view(-1)
+                )
             elif train_config.task == 'MLM':
                 # Calaulate loss.
                 shift_logits = outputs.logits[..., :-1, :].contiguous()
@@ -147,12 +169,16 @@ def train(
                 # Start from second word.
                 mask = batch_inputs['answer_mask'][..., 1:].to(device)
                 padding_id = torch.zeros_like(mask) + train_config.padding_idx
-                padding_id = padding_id * (mask==False)
+                padding_id = padding_id * (mask == False)
                 padding_id = padding_id.to(device)
-                shift_labels = batch_inputs['input_ids'][..., 1:].contiguous() * mask + padding_id
+                shift_labels = batch_inputs['input_ids'][..., 1:].contiguous(
+                ) * mask + padding_id
 
-                # Flatten the tokens
-                loss = criterion(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
+                # Flatten the tokens.
+                loss = criterion(
+                    shift_logits.view(-1, shift_logits.size(-1)),
+                    shift_labels.view(-1)
+                )
 
             total_loss += loss.item()
 
@@ -174,7 +200,7 @@ def train(
                 avg_loss = total_loss / train_config.log_step
                 writer.add_scalar('loss', avg_loss, iteration)
                 total_loss = 0
-                if not save_path:
+                if not train_config.save_path:
                     tune.report(loss=avg_loss)
 
             if iteration % train_config.save_ckpt_step == 0:

@@ -1,17 +1,28 @@
 import os
+import pickle
 import sqlite3
 from datetime import datetime as dt
-import pickle
+
 import datasets
+
+from _path import ROOT_PATH
 
 logger = datasets.logging.get_logger(__name__)
 
 _DESCRIPTION = """
 Collect Taiwan news from about 10 news media.
+和原版比起來增加`sentence_mask`的機率，讓每一篇文章平均有2句化被mask掉
+產生資料時使用的設定如下:
+- `document_mask_p`: 0.03
+- `sentence_mask_p`: 0.06
+- `word_mask_p`: 0.05
+- `ngram_mask_p`: 0.5
+- `min_ngram_length`: 2
+- `max_ngram_length`: 6
 """
 
-_TRAIN_PATH = os.path.join('dataset', 'mlm_train.pk')
-_TEST_PATH = os.path.join('dataset', 'mlm_test.pk')
+_TRAIN_PATH = os.path.join(ROOT_PATH, 'dataset', 'mlm_train2.pk')
+_TEST_PATH = os.path.join(ROOT_PATH, 'dataset', 'mlm_test2.pk')
 
 COMPANY_DICT = {
     1: 'chinatimes',

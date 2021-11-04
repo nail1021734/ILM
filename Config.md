@@ -10,6 +10,7 @@
 - log_step
 - exp_name
 - task
+- dataset_name
 
 ## hp_config
 

@@ -1,2 +1,6 @@
-**/
-*.py.lock
+**/.venv
+**/checkpoint
+**/dataset
+**/__pycache__
+**/utils/__pycache__
+*.lock
