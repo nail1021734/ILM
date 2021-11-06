@@ -134,10 +134,10 @@ def format(infr_result: str):
 
 if __name__ == '__main__':
     sen = inference(
-        ckpt_path='checkpoint/MLM_exp8_weight_Decay_error/checkpoint-2700000.pt',
+        ckpt_path='checkpoint/MLM_exp10/checkpoint-3200000.pt',
         tokenizer_name='chinese_tokenizer_big',
         max_seq_len=512,
-        prompt='[ARTICLE]「第<num>任總統副總統及第<num>屆立法委員選舉」<num>年<num>月<num>日投票,<loc0>選舉委員會總幹事<per0><num>日表示,[MASK_S],首投族有<num>萬多人,投開票所也增加<num>所,[MASK_S]。 <per0>說,這次選舉分為總統、立委及政黨票<num>種,每個投票所將設置<num>個選舉票匭,其中,[MASK_S],<loc0>登記參選立委有<num>人、政黨票有<num>組,不論是立委參選人數及政黨組都創歷年來新高。 <loc1>補充說明,<loc2>人口數已達<num>萬<num>人,比去年同期增加<num>萬<num>人,其中北屯區人口數更是大幅提升近<num>千人,此外,今年首投族人數統計至<num>月<num>日止有為<num>萬餘人,因此投開票所數量也從<num>所擴增至<num>所,以確保投票更為順暢快速。 <org0>表示,已請各區公所及<loc0>各機關利用網站、<en>群組鼓勵民眾踴躍投票,[MASK_S],攜帶本人身分證、印章及投票通知單,依投票通知單所載投票所地點前往投票。[SEP]',
+        prompt='[ARTICLE]<per0>育有<num>女<num>子,除了大女兒<per1>,小兒子<per2>也有在娛樂圈活動,[MASK_S],他哭笑不得地表示兒子有次無心的舉動,[MASK_S],「是不是幫我掛號讓我去問個醫生或怎麼樣?」後來才知道是烏龍一場。 <per0>最近在<unk>透露,<per2>曾讓房間內的電扇持續吹一整年,[MASK_S],一度想掛號就醫,一出門錄影卻又突然「好轉」,直到有次靠近兒子的房間時,耳鳴突然變得超大聲,他才終於抓到兇手! 往鋼琴底下一看,<per0>發現那裡有台電風扇,「連續吹風<num>年啊!」<per1>在旁邊有感而發地說:「這種男生要嘛只會關燈,[MASK_S],他沒辦法同時把這兩個地方都關了再出門!」 對此,<per2>事後解釋是因為擔心鋼琴會受潮,<per0>哭笑不得地說:「我終於在<per2>從<loc0>回<loc1>的時候,治好了我的耳鳴!恁爸差點就把他...!」對兒子是好氣又好笑。[SEP]',
         p=0.9
     )
     print(format(sen))
