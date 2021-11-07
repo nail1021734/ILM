@@ -59,56 +59,33 @@ def load_tokenizer(tokenizer_name, max_length):
     return tokenizer
 
 
-def callate_fn_creater(tokenizer, training_mode):
-    if training_mode == 'LM':
-        # Get tokenized dataset.
-        def tokenizer_function(data):
-            # TODO Use post processor to prevent truncate special token.
-            sample = [
-                f'[COMPANY]{i["company"]}' +
-                f'[REPORTER]{i["reporter"]}' +
-                f'[DATETIME]{i["datetime"]}' +
-                f'[CATEGORY]{i["category"]}' +
-                f'[TITLE]{i["title"]}' +
-                f'[ARTICLE]{i["article"]}[END]' for i in data]
-            tokenized_result = tokenizer(
-                sample, truncation=True, padding=True, return_tensors='pt')
-            del tokenized_result['token_type_ids']
+def callate_fn_creater(tokenizer):
+    # Set post processor to add special token.
+    tokenizer._tokenizer.post_processor = TemplateProcessing(
+        pair="[ARTICLE] $A [SEP] $B [END]",
+        special_tokens=[
+            ("[ARTICLE]", tokenizer.get_vocab()["[ARTICLE]"]),
+            ("[SEP]", tokenizer.get_vocab()["[SEP]"]),
+            ("[END]", tokenizer.get_vocab()["[END]"]),
+        ]
+    )
 
-            return tokenized_result
-        return tokenizer_function
-    elif training_mode == 'MLM':
-        # Get tokenized dataset.
+    def tokenizer_function(data):
+        masked_articles = [i["masked_article"] for i in data]
+        answers = [i["answer"] for i in data]
+        tokenized_result = tokenizer(
+            masked_articles, answers, truncation=True, padding=True, return_tensors='pt')
 
-        # Set post processor to add special token.
-        tokenizer._tokenizer.post_processor = TemplateProcessing(
-            pair="[ARTICLE] $A [SEP] $B [END]",
-            special_tokens=[
-                ("[ARTICLE]", tokenizer.get_vocab()["[ARTICLE]"]),
-                ("[SEP]", tokenizer.get_vocab()["[SEP]"]),
-                ("[END]", tokenizer.get_vocab()["[END]"]),
-            ]
-        )
+        sep_id = tokenizer.get_vocab()['[SEP]']
+        input_tensor = tokenized_result['input_ids']
+        create_ans_mask = torch.arange(input_tensor.shape[-1])
+        create_ans_mask = create_ans_mask > \
+            (input_tensor == sep_id).nonzero()[:, -1].unsqueeze(dim=-1)
+        tokenized_result['answer_mask'] = create_ans_mask
+        del tokenized_result['token_type_ids']
 
-        def tokenizer_function(data):
-            # TODO Use post processor to prevent truncate special token.
-            # sample = [
-            #     f'[ARTICLE]{i["masked_article"]}[SEP]{i["answer"]}[END]' for i in data]
-            masked_articles = [i["masked_article"] for i in data]
-            answers = [i["answer"] for i in data]
-            tokenized_result = tokenizer(
-                masked_articles, answers, truncation=True, padding=True, return_tensors='pt')
-
-            sep_id = tokenizer.get_vocab()['[SEP]']
-            input_tensor = tokenized_result['input_ids']
-            create_ans_mask = torch.arange(input_tensor.shape[-1])
-            create_ans_mask = create_ans_mask > \
-                (input_tensor == sep_id).nonzero()[:, -1].unsqueeze(dim=-1)
-            tokenized_result['answer_mask'] = create_ans_mask
-            del tokenized_result['token_type_ids']
-
-            return tokenized_result
-        return tokenizer_function
+        return tokenized_result
+    return tokenizer_function
 
 
 def load_dataset_by_name(dataset_name: str):
@@ -132,7 +109,6 @@ def create_data_loader(
     batch_size: int,
     tokenizer_name: str,
     max_length: int,
-    training_mode: str,
     dataset_name: str,
     shuffle: bool = True,
     testing: bool = False,
@@ -157,7 +133,6 @@ def create_data_loader(
         num_workers=4,
         collate_fn=callate_fn_creater(
             tokenizer=tokenizer,
-            training_mode=training_mode
         )
     )
 

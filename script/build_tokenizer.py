@@ -1,7 +1,7 @@
 import os
 from typing import List
 
-from datasets import load_dataset
+from utils.data_processor import load_dataset_by_name
 from more_itertools import chunked
 from tokenizers import (Tokenizer, decoders, models, normalizers,
                         pre_tokenizers, trainers)
@@ -19,9 +19,9 @@ def build_BPE_tokenizer(tokenizer_name: str, dataset: List[str], vocab_size: int
     special_tokens_list = ["[PAD]", "<unk>", "[CLS]", "[SEP]", "[MASK]",
                            "[TITLE]", "[ARTICLE]", "[REF]", "[END]", "<en>", "<num>",
                            "[COMPANY]", "[REPORTER]", "[DATETIME]", "[CATEGORY]"]
-    # special_tokens_list.extend([f'<per{i}>' for i in range(30)])
-    # special_tokens_list.extend([f'<org{i}>' for i in range(30)])
-    # special_tokens_list.extend([f'<loc{i}>' for i in range(30)])
+    special_tokens_list.extend([f'<per{i}>' for i in range(30)])
+    special_tokens_list.extend([f'<org{i}>' for i in range(30)])
+    special_tokens_list.extend([f'<loc{i}>' for i in range(30)])
 
     # Create batches of data.
     corpus = chunked((
@@ -62,7 +62,7 @@ def build_BPE_tokenizer(tokenizer_name: str, dataset: List[str], vocab_size: int
 
 
 if __name__ == '__main__':
-    dataset = load_dataset('dataset_script/Taiwan_news_dataset_notag.py')
+    dataset = load_dataset_by_name('LM_NT_data')
     build_BPE_tokenizer(
         tokenizer_name='chinese_tokenizer_big_NT',
         dataset=dataset,
