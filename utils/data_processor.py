@@ -2,9 +2,9 @@ import os
 
 import torch
 from datasets import load_dataset
+from tokenizers.processors import TemplateProcessing
 from torch.utils.data import DataLoader
 from transformers import PreTrainedTokenizerFast
-from tokenizers.processors import TemplateProcessing
 
 from _path import ROOT_PATH
 

@@ -29,6 +29,7 @@ COMPANY_DICT = {
     11: 'udn',
 }
 
+
 class TaiwanNewsConfig(datasets.BuilderConfig):
     def __init__(self, **kwargs):
         r"""BuilderConfig for TaiwanNewsDataset.

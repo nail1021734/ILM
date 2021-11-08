@@ -1,10 +1,10 @@
 import json
 import os
 import re
+
 import torch
 from transformers import GPT2Config, GPT2LMHeadModel, PreTrainedTokenizerFast
 
-from _path import ROOT_PATH
 from utils.data_processor import load_tokenizer
 
 

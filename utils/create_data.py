@@ -1,9 +1,11 @@
+import re
 from random import random, randrange
 from typing import Dict
+
 from tqdm import tqdm
-from utils.inference import inference
+
 from utils.data_processor import load_dataset_by_name, load_tokenizer
-import re
+from utils.inference import inference
 
 
 def mask_article(

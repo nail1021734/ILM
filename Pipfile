@@ -12,12 +12,9 @@ tensorboard = "*"
 gputil = "*"
 hyperopt = "*"
 isort = "*"
-torch = "*"
+flake8 = "*"
 
 [dev-packages]
 
 [requires]
 python_version = "3.8"
-
-[packages]
-ray = {extras = [ "tune",], version = "*"}

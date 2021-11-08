@@ -1,6 +1,7 @@
-from utils.create_data import mask_dataset
-import pickle
 import os
+import pickle
+
+from utils.create_data import mask_dataset
 
 if __name__ == '__main__':
     training_set, test_set = mask_dataset(

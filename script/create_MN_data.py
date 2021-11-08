@@ -1,4 +1,5 @@
 import pickle
+
 from utils.create_data import create_MN_data
 
 if __name__ == '__main__':

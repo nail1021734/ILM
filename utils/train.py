@@ -2,15 +2,15 @@ import json
 import os
 import random
 from argparse import Namespace
+from typing import Dict
 
 import numpy as np
 import torch
-from ray import tune
 from torch.nn import CrossEntropyLoss
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
-from transformers import GPT2LMHeadModel, GPT2Config
-from typing import Dict
+from transformers import GPT2Config, GPT2LMHeadModel
+
 from utils.data_processor import create_data_loader
 
 
@@ -116,6 +116,10 @@ def train(
     )
     model = model.to(device)
 
+    # Load from pretrained.
+    if config.ckpt_path:
+        model.load_state_dict(torch.load(config.ckpt_path))
+
     # Set bias and LayerNorm no weight dacay.
     no_decay = ['bias', 'ln']
     optim_group_params = [
@@ -140,6 +144,8 @@ def train(
         optim_group_params,
         lr=config.lr,
     )
+    if config.optimizer_path:
+        optimizer.load_state_dict(torch.load(config.optimizer_path))
 
     warm_up_function = create_warm_up_function(
         config=config,
@@ -201,8 +207,6 @@ def train(
                 avg_loss = total_loss / config.log_step
                 writer.add_scalar('loss', avg_loss, iteration)
                 total_loss = 0
-                if not config.save_path:
-                    tune.report(loss=avg_loss)
 
             if iteration % config.save_ckpt_step == 0:
                 save_model(

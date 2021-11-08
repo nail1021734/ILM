@@ -1,11 +1,12 @@
 import os
 from typing import List
 
-from utils.data_processor import load_dataset_by_name
 from more_itertools import chunked
 from tokenizers import (Tokenizer, decoders, models, normalizers,
                         pre_tokenizers, trainers)
+
 from _path import ROOT_PATH
+from utils.data_processor import load_dataset_by_name
 
 
 def build_BPE_tokenizer(tokenizer_name: str, dataset: List[str], vocab_size: int):
