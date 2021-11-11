@@ -1,5 +1,5 @@
 import re
-from random import random, randrange
+from random import random, randrange, choice
 from typing import Dict
 
 from tqdm import tqdm
@@ -74,7 +74,7 @@ def mask_sentences(dataset, mask_range: Dict, max_fail_count: int):
         while True:
             if mask_range['max'] > masked_rate > mask_range['min']:
                 break
-            choose_id = random.choice(range(len(sentences)))
+            choose_id = choice(range(len(sentences)))
             if (re.match(r'[^，,。：,:；;！!？?]', sentences[choose_id]) and
                     sentences[choose_id] != '[MASK_S]'):
                 sent_mask_rate = len(
@@ -133,7 +133,7 @@ def create_MN_data(
         # Check if data amount more than `data_num`.
         # If so than stop generate data.
         # Just treat remain data as positive data.
-        if len(MN_dataset) >= data_num:
+        if len([i for i in MN_dataset if i['label'] == 0]) >= data_num:
             MN_dataset.append({
                 'id': data['id'],
                 'article': data['article'],
