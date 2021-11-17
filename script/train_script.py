@@ -9,17 +9,17 @@ if __name__ == '__main__':
         tokenizer_name='chinese_tokenizer_big',
         save_ckpt_step=80000,
         log_step=500,
-        exp_name='train_from_exp10_reduce_lr',
+        exp_name='MLM_exp11',
         dataset_name='MLM_dataset_v3',
-        from_pretrained_model='checkpoint/MLM_exp10/checkpoint-4086331.pt',
+        # from_pretrained_model='checkpoint/MLM_exp10/checkpoint-4086331.pt',
 
         # Hyperparameters.
         seed=22,
-        lr=2e-5,
+        lr=2e-4,
         epoch_num=30,
         batch_size=8,
         accumulate_step=40,
-        warm_up_step_rate=0.00,
+        warm_up_step_rate=0.02,
         weight_decay=0.01,
 
         # Model config. (Use to create `GPT2Config` object.)

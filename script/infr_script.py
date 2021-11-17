@@ -1,11 +1,12 @@
-from utils.inference import inference
+from utils.inference import inference, format
 
 if __name__ == '__main__':
     sen = inference(
-        ckpt_path='checkpoint/MLM_exp10/checkpoint-3200000.pt',
+        ckpt_path='checkpoint/MLM_exp10/checkpoint-4086331.pt',
         tokenizer_name='chinese_tokenizer_big',
         max_seq_len=512,
-        prompt='[ARTICLE]<per0>育有<num>女<num>子,除了大女兒<per1>,小兒子<per2>也有在娛樂圈活動,[MASK_S],他哭笑不得地表示兒子有次無心的舉動,[MASK_S],「是不是幫我掛號讓我去問個醫生或怎麼樣?」後來才知道是烏龍一場。 <per0>最近在<unk>透露,<per2>曾讓房間內的電扇持續吹一整年,[MASK_S],一度想掛號就醫,一出門錄影卻又突然「好轉」,直到有次靠近兒子的房間時,耳鳴突然變得超大聲,他才終於抓到兇手! 往鋼琴底下一看,<per0>發現那裡有台電風扇,「連續吹風<num>年啊!」<per1>在旁邊有感而發地說:「這種男生要嘛只會關燈,[MASK_S],他沒辦法同時把這兩個地方都關了再出門!」 對此,<per2>事後解釋是因為擔心鋼琴會受潮,<per0>哭笑不得地說:「我終於在<per2>從<loc0>回<loc1>的時候,治好了我的耳鳴!恁爸差點就把他...!」對兒子是好氣又好笑。[SEP]',
-        p=0.9
+        prompt='[ARTICLE]前<loc0>市長<per0>、<org0>立委<per1><num>日合體,首度揭露「<per2>的秘密檔案」。<per1>首先自爆「最長部位」,[MASK_S],面對超勁爆的私人問題兩人絲毫不害臊,最後更直接示範「最愛姿勢」,引人遐想。 <per0>、<per1><num>日在臉書發布影片,[MASK_S],被問及「覺得自己哪理最長?」時,<per0>回答「腿」,<per1>則表示自己「氣最長」,[MASK_S],憋氣可以憋很久,另外就是「堅持」。 [MASK_S],<per0>爆料自己「全身都很敏感」,[MASK_S],所以皮膚是最敏感的地方。一聽到<per0>的回答,[MASK_S],因為「很喜歡聽老婆甜言蜜語」、「不是觸覺的那種,你們想歪了」<per0>也自嘲,「我太太說我耳朵很不敏感,因為她講什麼我常常都聽不到。」 [MASK_S],兩人直接示範「最喜歡的姿勢」,可見<per0>右手托著下巴<per1>則是雙手往前伸、比出「雙手緊握圈」的姿勢,原來是最喜歡跟選民「握手」。[SEP]',
+        k=40,
+        strategy='top-k'
     )
     print(format(sen))

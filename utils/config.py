@@ -43,15 +43,18 @@ def build_configs(
     # Load tokenizer to get padding token id.
     tokenizer = load_tokenizer(tokenizer_name, max_length=max_length)
 
-    # Automaticly infill `vocab_size` parameter in model config.
-    model_config['vocab_size'] = len(tokenizer.get_vocab())
 
+    # Get pretrained model optimizer path.
     if from_pretrained_model:
         dir_path = os.path.dirname(from_pretrained_model)
         ckpt_step = os.path.basename(from_pretrained_model).split('-')[-1]
         optimizer_path = os.path.join(dir_path, f'optimizer-{ckpt_step}')
     else:
         optimizer_path = None
+
+    # Automaticly infill `vocab_size` parameter in model config.
+    model_config['vocab_size'] = len(tokenizer.get_vocab())
+
     # Return training config.
     return (
         {

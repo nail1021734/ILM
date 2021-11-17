@@ -7,6 +7,69 @@ from transformers import GPT2Config, GPT2LMHeadModel, PreTrainedTokenizerFast
 
 from utils.data_processor import load_tokenizer
 
+def top_k(
+    model: GPT2LMHeadModel,
+    tokenizer: PreTrainedTokenizerFast,
+    prompt: str,
+    max_seq_len: int,
+    k: float,
+):
+    device = next(model.parameters()).device
+
+    prev_tkids = tokenizer(prompt, return_tensors='pt')
+
+    # Move tensors to model running device.
+    prev_tkids = prev_tkids.to(device)
+
+    # Get input ids.
+    prev_tkids = prev_tkids.input_ids
+
+    # Calculate how many token can be generate at most.
+    out_seq_len = max_seq_len - prev_tkids.shape[1]
+    if out_seq_len < 0:
+        raise Exception('`prompt length` > `max_seq_length`')
+
+    # Generate tokens.
+    for _ in range(out_seq_len):
+        next_tkids_probs = torch.nn.functional.softmax(
+            model(input_ids=prev_tkids).logits,
+            dim=-1
+        )
+
+        next_tkid_probs = next_tkids_probs[:, -1]
+
+        (
+            topk_tkid_probs,
+            topk_tkid,
+        ) = next_tkid_probs.topk(
+            k=k,
+            dim=-1
+        )
+
+        next_tkid_cand_idx = torch.multinomial(
+            topk_tkid_probs,
+            num_samples=1,
+        )
+        next_tkid = torch.gather(
+            topk_tkid,
+            -1,
+            next_tkid_cand_idx,
+        )
+
+        prev_tkids = torch.cat(
+            [prev_tkids, next_tkid],
+            dim=-1
+        )
+
+        # If the prediction token id is `[END]`, then stop prediction.
+        if next_tkid[0, 0].item() == tokenizer.eos_token_id:
+            break
+
+    # Output generated text.
+    return tokenizer.decode(
+        token_ids=prev_tkids[0],
+    )
+
 
 def top_p(
     model: GPT2LMHeadModel,
@@ -76,12 +139,18 @@ def top_p(
 
 
 def inference(
+    strategy: str,
     ckpt_path: str,
     tokenizer_name: str,
     max_seq_len: int,
     prompt: str,
-    p: float,
+    k: float = None,
+    p: float = None,
 ):
+    if k is None and p is None:
+        raise Exception('Must give `k` or `p` parameter.')
+
+    # Select device to inference.
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # Get checkpoint directory.
@@ -99,13 +168,22 @@ def inference(
     # Load tokenizer.
     tokenizer = load_tokenizer(tokenizer_name, max_length=max_seq_len)
 
-    return top_p(
-        model=model,
-        tokenizer=tokenizer,
-        prompt=prompt,
-        max_seq_len=max_seq_len,
-        p=p
-    )
+    if strategy == 'top-p':
+        return top_p(
+            model=model,
+            tokenizer=tokenizer,
+            prompt=prompt,
+            max_seq_len=max_seq_len,
+            p=p,
+        )
+    elif strategy == 'top-k':
+        return top_k(
+            model=model,
+            tokenizer=tokenizer,
+            prompt=prompt,
+            max_seq_len=max_seq_len,
+            k=k,
+        )
 
 
 def format(infr_result: str):

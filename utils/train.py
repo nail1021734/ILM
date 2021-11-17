@@ -194,6 +194,7 @@ def train(
             epoch_iter.set_description(
                 f'epoch: {epoch}, loss: {loss.item():.6f}'
             )
+            loss = loss / config.accumulate_step
             loss.backward()
 
             if iteration % config.accumulate_step == 0:
