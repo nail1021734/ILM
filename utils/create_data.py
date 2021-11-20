@@ -1,14 +1,15 @@
 import re
-from copy import deepcopy
-from functools import partial
-from random import choice, random, randrange
-from typing import Callable, Dict, List
+from random import random, randrange, choice, sample
+from typing import Dict, List, Callable, Union
 
 from tqdm import tqdm
-from transformers import PreTrainedTokenizerFast
 
 from utils.data_processor import load_dataset_by_name, load_tokenizer
-from utils.inference import format_article, inference
+from utils.inference import inference, format_article
+from transformers import PreTrainedTokenizerFast
+from functools import partial
+from copy import deepcopy
+from collections import Counter
 
 
 def mask_article(
@@ -70,16 +71,17 @@ def mask_article(
         )
 
 
-def mask_sentences_accr_token(
+def mask_sent_by_token_rate(
     dataset,
     tokenizer: PreTrainedTokenizerFast,
-    mask_range: Dict,
+    mask_rate: Dict,
     max_fail_count: int,
 ):
     r"""Mask sentences according token rate.(依照 mask 掉的 token 比例，決定
     還要不要 MASK)
     """
     result = []
+    mask_token_rate = []
     for data in tqdm(dataset):
         sentence_spliter = re.compile(r'([，,。：,:；;！!？?])')
         sentences = sentence_spliter.split(data['article'])
@@ -88,13 +90,13 @@ def mask_sentences_accr_token(
         article_len = len(tokenizer.tokenize(data['article']))
         sentences_len = [len(tokenizer.tokenize(i)) for i in sentences]
         while True:
-            if mask_range['max'] > masked_rate > mask_range['min']:
+            if mask_rate['max'] > masked_rate > mask_rate['min']:
                 break
             choose_id = choice(range(len(sentences)))
             if (re.match(r'[^，,。：,:；;！!？?]', sentences[choose_id]) and
                     sentences[choose_id] != '[MASK_S]'):
                 sent_mask_rate = sentences_len[choose_id] / article_len
-                if masked_rate + sent_mask_rate > mask_range['max']:
+                if masked_rate + sent_mask_rate > mask_rate['max']:
                     fail_count += 1
                     if fail_count >= max_fail_count:
                         break
@@ -106,46 +108,60 @@ def mask_sentences_accr_token(
                 ['[ARTICLE]'] + sentences + ['[SEP]'])
             del data['answer']
             result.append(data)
-    return result
+            mask_token_rate.append(masked_rate)
+    # Calculate average of mask token rate.
+    avg_mask_token_rate = sum(mask_token_rate) / len(mask_token_rate)
+    return result, avg_mask_token_rate
 
 
-def mask_sent_sent_rate(
+def mask_sent_by_sent_rate(
     dataset,
     tokenizer: PreTrainedTokenizerFast,
-    mask_range: Dict,
-    max_fail_count: int,
+    mask_rate: float,
 ):
     r"""Mask sentences according sentence rate.(依照 mask 掉的句子比例，決定
     還要不要 MASK)
     """
     result = []
+    mask_token_rate_list = []
     for data in tqdm(dataset):
+        # Split sentences while reserve punctuation.
         sentence_spliter = re.compile(r'([，,。：,:；;！!？?])')
         sentences = sentence_spliter.split(data['article'])
-        masked_rate = 0
-        fail_count = 0
+
+        # Get list of sentences without punctuation.
+        filtered_sentences = list(filter(
+            lambda s: not re.match(r'([，,。：,:；;！!？?\s]|^$)', s),
+            sentences
+        ))
+
+        # Calculate how many sentence need to be masked.
+        mask_sent_num = int(len(filtered_sentences) * mask_rate)
+
+        # Calculate article length.
         article_len = len(tokenizer.tokenize(data['article']))
-        sentences_len = [len(tokenizer.tokenize(i)) for i in sentences]
-        while True:
-            if mask_range['max'] > masked_rate > mask_range['min']:
-                break
-            choose_id = choice(range(len(sentences)))
-            if (re.match(r'[^，,。：,:；;！!？?]', sentences[choose_id]) and
-                    sentences[choose_id] != '[MASK_S]'):
-                sent_mask_rate = sentences_len[choose_id] / article_len
-                if masked_rate + sent_mask_rate > mask_range['max']:
-                    fail_count += 1
-                    if fail_count >= max_fail_count:
-                        break
-                    continue
-                sentences[choose_id] = '[MASK_S]'
-                masked_rate += sent_mask_rate
-        if max_fail_count >= fail_count:
-            data['masked_article'] = ''.join(
-                ['[ARTICLE]'] + sentences + ['[SEP]'])
-            del data['answer']
-            result.append(data)
-    return result
+
+        # Choose which sentence to mask.
+        choose_ids = sample(range(len(filtered_sentences)), mask_sent_num)
+
+        # Mask article and calculate masked token rate.
+        masked_token_rate = 0
+        for i in choose_ids:
+            choosed_sent = filtered_sentences[i]
+            masked_token_rate += len(tokenizer.tokenize(choosed_sent)
+                                     ) / article_len
+            sentences[sentences.index(choosed_sent)] = '[MASK_S]'
+        mask_token_rate_list.append(masked_token_rate)
+
+        # Add bos token and sep token.
+        data['masked_article'] = ''.join(
+            ['[ARTICLE]'] + sentences + ['[SEP]'])
+
+        # Delete answer column.
+        del data['answer']
+        result.append(data)
+    # Return masked articles and avg_masked_rate.
+    return result, sum(mask_token_rate_list) / len(mask_token_rate_list)
 
 
 def re_generate_fail_data(
@@ -169,6 +185,8 @@ def re_generate_fail_data(
 
         # Reset `prompts` to store still fail articles for next iteration.
         prompts = []
+        # Counting each type of error log.
+        err_counter = Counter()
         for index, article in zip(
             deepcopy(re_generated_id),
             infr_result
@@ -181,10 +199,12 @@ def re_generate_fail_data(
                 # Remove this article id in `re_generated_id` list.
                 re_generated_id.remove(index)
             except Exception as err:
-                print(err.args)
+                err_counter.update(err.args)
                 # If still not correct then add failed articles in `prompts`
                 # for next iteration.
                 prompts.append(fail_articles[index])
+        # Print error log.
+        print(err_counter)
 
     # Print amount of fail article.
     if len(re_generated_id) > 0:
@@ -205,7 +225,7 @@ def create_MN_data(
     k: float = None,
     max_prompt_len: int = 400,
     use_test_data: bool = True,
-    mask_range: Dict = None,
+    mask_rate: Union[Dict[str, float], float] = None,
     mask_fail_count: int = 15,
     batch_size: int = 8,
 ):
@@ -246,14 +266,22 @@ def create_MN_data(
 
     # Mask machine data.
     if mask_strategy == 'Sentence_token_rate':
-        machine_data = mask_sentences(
+        machine_data, avg_masked_rate = mask_sent_by_token_rate(
             dataset=machine_data,
-            mask_range=mask_range,
+            mask_rate=mask_rate,
             max_fail_count=mask_fail_count,
             tokenizer=tokenizer,
         )
+    elif mask_strategy == 'Sentence_sent_rate':
+        machine_data, avg_masked_rate = mask_sent_by_sent_rate(
+            dataset=machine_data,
+            tokenizer=tokenizer,
+            mask_rate=mask_rate,
+        )
     else:
         raise Exception('Mask strategy not exist.')
+
+    print(f'Average mask token rate: {avg_masked_rate}')
 
     # Create partial inference function.
     partial_infr_func = partial(

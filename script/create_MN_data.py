@@ -10,9 +10,10 @@ if __name__ == '__main__':
         max_seq_len=512,
         k=40,
         data_num=50000,
-        mask_strategy='Sentence',
-        use_test_data=True,
+        mask_strategy='Sentence_sent_rate',
+        use_test_data=False,
         batch_size=32,
-        mask_range={'max': 0.35, 'min': 0.25},
+        # mask_rate={'max': 0.35, 'min': 0.25},
+        mask_rate=0.35,
     )
     pickle.dump(MN_dataset, open('test.pkl', 'wb'))

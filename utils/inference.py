@@ -161,7 +161,7 @@ def format_article(infr_result: str):
     if '' in answers:
         raise Exception('Generated article have empty answer.')
     for ans in answers:
-        article = re.sub(r'\[MASK_[WSD]\]', f'=={ans}==', article, 1)
+        article = re.sub(r'\[MASK_[WSD]\]', f'{ans}', article, 1)
     article = ''.join(article.split(' '))
 
     return article
