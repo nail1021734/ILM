@@ -1,11 +1,14 @@
 import re
-from random import random, randrange, choice
-from typing import Dict
+from copy import deepcopy
+from functools import partial
+from random import choice, random, randrange
+from typing import Callable, Dict, List
 
 from tqdm import tqdm
+from transformers import PreTrainedTokenizerFast
 
 from utils.data_processor import load_dataset_by_name, load_tokenizer
-from utils.inference import inference
+from utils.inference import format_article, inference
 
 
 def mask_article(
@@ -61,24 +64,36 @@ def mask_article(
                     else:
                         masked_sentences.append(tokenized_sent[word_idx])
                     word_idx += 1
-        return (''.join(masked_sentences), ans_end_token.join(answer) + ans_end_token)
+        return (
+            ''.join(masked_sentences),
+            ans_end_token.join(answer) + ans_end_token
+        )
 
 
-def mask_sentences(dataset, mask_range: Dict, max_fail_count: int):
+def mask_sentences_accr_token(
+    dataset,
+    tokenizer: PreTrainedTokenizerFast,
+    mask_range: Dict,
+    max_fail_count: int,
+):
+    r"""Mask sentences according token rate.(依照 mask 掉的 token 比例，決定
+    還要不要 MASK)
+    """
     result = []
     for data in tqdm(dataset):
         sentence_spliter = re.compile(r'([，,。：,:；;！!？?])')
         sentences = sentence_spliter.split(data['article'])
         masked_rate = 0
         fail_count = 0
+        article_len = len(tokenizer.tokenize(data['article']))
+        sentences_len = [len(tokenizer.tokenize(i)) for i in sentences]
         while True:
             if mask_range['max'] > masked_rate > mask_range['min']:
                 break
             choose_id = choice(range(len(sentences)))
             if (re.match(r'[^，,。：,:；;！!？?]', sentences[choose_id]) and
                     sentences[choose_id] != '[MASK_S]'):
-                sent_mask_rate = len(
-                    sentences[choose_id]) / len(data['article'])
+                sent_mask_rate = sentences_len[choose_id] / article_len
                 if masked_rate + sent_mask_rate > mask_range['max']:
                     fail_count += 1
                     if fail_count >= max_fail_count:
@@ -87,10 +102,96 @@ def mask_sentences(dataset, mask_range: Dict, max_fail_count: int):
                 sentences[choose_id] = '[MASK_S]'
                 masked_rate += sent_mask_rate
         if max_fail_count >= fail_count:
-            data['masked_article'] = ''.join(sentences)
+            data['masked_article'] = ''.join(
+                ['[ARTICLE]'] + sentences + ['[SEP]'])
             del data['answer']
             result.append(data)
     return result
+
+
+def mask_sent_sent_rate(
+    dataset,
+    tokenizer: PreTrainedTokenizerFast,
+    mask_range: Dict,
+    max_fail_count: int,
+):
+    r"""Mask sentences according sentence rate.(依照 mask 掉的句子比例，決定
+    還要不要 MASK)
+    """
+    result = []
+    for data in tqdm(dataset):
+        sentence_spliter = re.compile(r'([，,。：,:；;！!？?])')
+        sentences = sentence_spliter.split(data['article'])
+        masked_rate = 0
+        fail_count = 0
+        article_len = len(tokenizer.tokenize(data['article']))
+        sentences_len = [len(tokenizer.tokenize(i)) for i in sentences]
+        while True:
+            if mask_range['max'] > masked_rate > mask_range['min']:
+                break
+            choose_id = choice(range(len(sentences)))
+            if (re.match(r'[^，,。：,:；;！!？?]', sentences[choose_id]) and
+                    sentences[choose_id] != '[MASK_S]'):
+                sent_mask_rate = sentences_len[choose_id] / article_len
+                if masked_rate + sent_mask_rate > mask_range['max']:
+                    fail_count += 1
+                    if fail_count >= max_fail_count:
+                        break
+                    continue
+                sentences[choose_id] = '[MASK_S]'
+                masked_rate += sent_mask_rate
+        if max_fail_count >= fail_count:
+            data['masked_article'] = ''.join(
+                ['[ARTICLE]'] + sentences + ['[SEP]'])
+            del data['answer']
+            result.append(data)
+    return result
+
+
+def re_generate_fail_data(
+    fail_articles: List[str],
+    infr_function: Callable,
+    max_fail_times: int = 3,
+):
+    regenerated_articles = [''] * len(fail_articles)
+    re_generated_id = list(range(len(fail_articles)))
+    prompts = deepcopy(fail_articles)
+
+    # Try generate failed article `max_fail_times` times.
+    for _ in range(max_fail_times):
+        # If all article generate success then break.
+        if len(re_generated_id) == 0:
+            break
+        print(f'Regenerate {len(re_generated_id)} articles.')
+
+        # Generate articles.
+        infr_result = infr_function(prompts=prompts)
+
+        # Reset `prompts` to store still fail articles for next iteration.
+        prompts = []
+        for index, article in zip(
+            deepcopy(re_generated_id),
+            infr_result
+        ):
+            try:
+                # Format article to check whether article format correct.
+                formated_article = format_article(article)
+                # If correct then save this article in it's index.
+                regenerated_articles[index] = formated_article
+                # Remove this article id in `re_generated_id` list.
+                re_generated_id.remove(index)
+            except Exception as err:
+                print(err.args)
+                # If still not correct then add failed articles in `prompts`
+                # for next iteration.
+                prompts.append(fail_articles[index])
+
+    # Print amount of fail article.
+    if len(re_generated_id) > 0:
+        print(f'{len(re_generated_id)} articles still failed'
+              + f' after try {max_fail_times} times.')
+
+    return regenerated_articles
 
 
 def create_MN_data(
@@ -98,124 +199,113 @@ def create_MN_data(
     dataset_name: str,
     tokenizer_name: str,
     max_seq_len: int,
-    p: float,
     data_num: int,
+    mask_strategy: str,
+    p: float = None,
+    k: float = None,
+    max_prompt_len: int = 400,
     use_test_data: bool = True,
     mask_range: Dict = None,
     mask_fail_count: int = 15,
+    batch_size: int = 8,
 ):
     # Load dataset.
     dataset = load_dataset_by_name(
         dataset_name=dataset_name
     )
 
+    # Load tokenizer.
+    tokenizer = load_tokenizer(
+        tokenizer_name=tokenizer_name,
+        max_length=max_seq_len
+    )
+
     # Select specify dataset.
     if use_test_data:
-        if mask_range:
-            dataset = mask_sentences(
-                dataset=dataset['test'],
-                mask_range=mask_range,
-                max_fail_count=mask_fail_count
-            )
-        data_iter = tqdm(dataset)
+        dataset = dataset['test']
     else:
-        if mask_range:
-            dataset = mask_sentences(
-                dataset=dataset['train'],
-                mask_range=mask_range,
-                max_fail_count=mask_fail_count
-            )
-        data_iter = tqdm(dataset)
+        dataset = dataset['train']
 
-    # Store data in `MN_dataset`.
-    MN_dataset = []
-    for data in data_iter:
-        # Check if data amount more than `data_num`.
-        # If so than stop generate data.
-        # Just treat remain data as positive data.
-        if len([i for i in MN_dataset if i['label'] == 0]) >= data_num:
-            MN_dataset.append({
-                'id': data['id'],
-                'article': data['article'],
-                'label': 1,
-                'origin_article': data['article'],
-                'title': data['title'],
-                'reporter': data['reporter'],
-                'datetime': data['datetime'],
-                'category': data['category'],
-                'company': data['company'],
-            })
-            continue
+    # Drop article that amount of token larger than `max_prompt_len - 2`.
+    # (Include `[ARTICLE]` and `[SEP]` so minus 2)
+    data = []
+    for i in tqdm(dataset):
+        if len(tokenizer.tokenize(i['article'])) < max_prompt_len - 2:
+            data.append(i)
+    dataset = data
 
+    # Split human article and machine article.
+    dataset = dataset[:data_num*2]
+    human_data = dataset[:len(dataset)//2]
+    machine_data = dataset[len(dataset)//2:]
+
+    # Adjust format.
+    for data in human_data:
+        data['origin_article'] = data['article']
+        data['label'] = 1
+
+    # Mask machine data.
+    if mask_strategy == 'Sentence_token_rate':
+        machine_data = mask_sentences(
+            dataset=machine_data,
+            mask_range=mask_range,
+            max_fail_count=mask_fail_count,
+            tokenizer=tokenizer,
+        )
+    else:
+        raise Exception('Mask strategy not exist.')
+
+    # Create partial inference function.
+    partial_infr_func = partial(
+        inference,
+        ckpt_path=ckpt_path,
+        tokenizer_name=tokenizer_name,
+        max_seq_len=max_seq_len,
+        p=p,
+        k=k,
+        batch_size=batch_size
+    )
+
+    # Inference machine data.
+    infr_result = partial_infr_func(
+        prompts=[i['masked_article'] for i in machine_data],
+    )
+
+    # Align `infr_result` with machine dataset.
+    for index, data in enumerate(machine_data):
+        data['origin_article'] = data['article']
+        data['article'] = infr_result[index]
+        data['label'] = 0
+
+    # Format machine generate article.
+    fail_index = []
+    for index, data in enumerate(machine_data):
         try:
-            # Get inference result.
-            infr_result = inference(
-                ckpt_path=ckpt_path,
-                tokenizer_name=tokenizer_name,
-                max_seq_len=max_seq_len,
-                prompt='[ARTICLE]' + data['masked_article'] + '[SEP]',
-                p=p
-            )
-            # Remove whitespace between tokens.
-            infr_result = infr_result.replace(' ', '')
+            data['article'] = format_article(data['article'])
         except:
-            continue
-        # If inference result format error then continue.
-        if not infr_result.endswith('[END]'):
-            continue
-        if not infr_result.startswith('[ARTICLE]'):
-            continue
+            # Maybe generated article format is broken.
+            data['article'] = ''
+            fail_index.append(index)
 
-        # Remove bos and eos in inference result.
-        infr_result = infr_result.replace('[ARTICLE]', '')
-        infr_result = infr_result.replace('[END]', '')
+    # Try to regenerate fail articles.
+    regenerate_result = re_generate_fail_data(
+        fail_articles=[machine_data[i]['masked_article'] for i in fail_index],
+        infr_function=partial_infr_func,
+        max_fail_times=5,
+    )
 
-        # Parse inference result to article.
-        # (Use generated tokens to infill `[MASK]` token).
-        try:
-            if infr_result.find('[MASK]') != -1:
-                # MLM dataset version littler than `MLM_dataset_v3`.
-                answers = infr_result.split('[SEP]')[1].split('[MASK]')
-                article = infr_result.split('[SEP]')[0]
-                for ans in answers:
-                    if ans == '':
-                        raise Exception('Empty answer.')
-                    article = article.replace('[MASK]', ans, 1)
-            elif infr_result.find('[ANS]') != -1:
-                # MLM dataset version above than `MLM_dataset_v3`.
-                answers = infr_result.split('[SEP]')[1].split('[ANS]')[:-1]
-                article = infr_result.split('[SEP]')[0]
-                for ans in answers:
-                    if ans == '':
-                        raise Exception('Empty answer.')
-                    article = re.sub(r'\[MASK_.\]', ans, article, 1)
-            MN_dataset.append({
-                'id': data['id'],
-                'article': article,
-                'label': 0,
-                'origin_article': data['article'],
-                'title': data['title'],
-                'reporter': data['reporter'],
-                'datetime': data['datetime'],
-                'category': data['category'],
-                'company': data['company'],
-            })
-        except Exception as err:
-            # If inference result has error then treat it as positive data.
-            MN_dataset.append({
-                'id': data['id'],
-                'article': data['article'],
-                'label': 1,
-                'origin_article': data['article'],
-                'title': data['title'],
-                'reporter': data['reporter'],
-                'datetime': data['datetime'],
-                'category': data['category'],
-                'company': data['company'],
-            })
-            pass
+    # Fill regenerated article in `machine_data`.
+    for i, regen_article in zip(fail_index, regenerate_result):
+        machine_data[i]['article'] = regen_article
 
-    return MN_dataset
+    # Remove bad generate article.
+    machine_data = list(
+        filter(lambda data: data['article'] != '', machine_data))
+
+    # Let human data has same amount article with machine data.
+    human_data = human_data[:len(machine_data)]
+
+    return human_data + machine_data
 
 
 def mask_dataset(
