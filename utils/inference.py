@@ -1,6 +1,6 @@
 import json
 import os
-import re
+import regex as re
 from typing import List, Union
 
 import torch
@@ -156,12 +156,12 @@ def format_article(infr_result: str):
     answers = infr_result.split('[SEP]')[1].split('[ANS]')[:-1]
     article = infr_result.split('[SEP]')[0]
 
-    if len(answers) != len(re.findall(r'\[MASK_[WSD]\]', article)):
+    if len(answers) != len(re.findall(r'\[MASK_[WSDN]\]', article)):
         raise Exception('Input error.')
     if '' in answers:
         raise Exception('Generated article have empty answer.')
     for ans in answers:
-        article = re.sub(r'\[MASK_[WSD]\]', f'{ans}', article, 1)
+        article = re.sub(r'\[MASK_[WSDN]\]', f'=={ans}==', article, 1)
     article = ''.join(article.split(' '))
 
     return article

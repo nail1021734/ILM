@@ -12,17 +12,17 @@ Collect Taiwan news from about 10 news media.
 和v2比起來減少`sentence_mask`的機率，並且各種MASK方法用不同token表示
 產生資料時使用的設定如下:
 - `document_mask_p`: 0.03
-- `sentence_mask_p`: 0.045
-- `word_mask_p`: 0.05
+- `sentence_mask_p`: 0.1
+- `word_mask_p`: 0.1
 - `ngram_mask_p`: 0.5
 - `min_ngram_length`: 2
 - `max_ngram_length`: 6
 
-約mask總文章的10%
+大約mask總文章量的20%
 """
 
-_TRAIN_PATH = os.path.join(ROOT_PATH, 'dataset', 'mlm_train3.pk')
-_TEST_PATH = os.path.join(ROOT_PATH, 'dataset', 'mlm_test3.pk')
+_TRAIN_PATH = os.path.join(ROOT_PATH, 'dataset', 'mlm_train4.pk')
+_TEST_PATH = os.path.join(ROOT_PATH, 'dataset', 'mlm_test4.pk')
 
 COMPANY_DICT = {
     1: 'chinatimes',

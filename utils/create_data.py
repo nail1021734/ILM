@@ -1,4 +1,4 @@
-import re
+import regex as re
 from random import random, randrange, choice, sample
 from typing import Dict, List, Callable, Union
 
@@ -22,11 +22,21 @@ def mask_article(
     min_ngram_length: int,
     max_ngram_length: int,
 ):
-    sentence_spliter = re.compile(r'([，,。：,:；;！!？?])')
+    sentence_spliter = re.compile(
+        # 抓不在 `」` 左邊的標點符號.
+        r'([，,。：,:；;！!？?](?!」)'
+        # 抓引號內包含標點符號,且有標點符號不在 `」` 左邊的 `「`.
+        + r'|「(?![^，,。：,:；;！!？?]*?[，,。：,:；;！!？?]?」)'
+        # 抓引號內包含標點符號,且有標點符號不在 `」` 左邊的 `」`.(若`」` 左邊有 `!`，
+        # 抓出來會是 `!」`,若沒有標點符號抓出來會是 `」`.)
+        + r'|[，,。：,:；;！!？?]?」'
+        + r'(?<!「[^，,。：,:；;！!？?]*?[，,。：,:；;！!？?]?」))'
+    )
     article = ''.join(tokenizer.tokenize(article)[:tokenizer.model_max_length])
     mask_w_token = tokenizer.mask_token
     mask_sent_token = '[MASK_S]'
     mask_doc_token = '[MASK_D]'
+    mask_n_gram_token = '[MASK_N]'
     ans_end_token = '[ANS]'
     if random() < document_mask_p:
         masked_article = mask_doc_token
@@ -36,9 +46,8 @@ def mask_article(
         sentences = sentence_spliter.split(article)
         masked_sentences = []
         answer = []
-        alphabet = ['，', ',', '。', '：', ':', '；', ';', '！', '!', '？', '?']
         for sent in sentences:
-            if sent in alphabet:
+            if re.match(r'([「」，,。：,:；;！!？?]|^$)', sent):
                 masked_sentences.append(sent)
                 continue
             if random() < sentence_mask_p:
@@ -54,7 +63,7 @@ def mask_article(
                                 min_ngram_length,
                                 max_ngram_length
                             )
-                            masked_sentences.append(mask_w_token)
+                            masked_sentences.append(mask_n_gram_token)
                             answer.append(
                                 ''.join(tokenized_sent[word_idx: word_idx+n]))
                             word_idx += n
@@ -83,7 +92,16 @@ def mask_sent_by_token_rate(
     result = []
     mask_token_rate = []
     for data in tqdm(dataset):
-        sentence_spliter = re.compile(r'([，,。：,:；;！!？?])')
+        sentence_spliter = re.compile(
+            # 抓不在 `」` 左邊的標點符號.
+            r'([，,。：,:；;！!？?](?!」)'
+            # 抓引號內包含標點符號,且有標點符號不在 `」` 左邊的 `「`.
+            + r'|「(?![^，,。：,:；;！!？?]*?[，,。：,:；;！!？?]?」)'
+            # 抓引號內包含標點符號,且有標點符號不在 `」` 左邊的 `」`.(若`」` 左邊有 `!`，
+            # 抓出來會是 `!」`,若沒有標點符號抓出來會是 `」`.)
+            + r'|[，,。：,:；;！!？?]?」'
+            + r'(?<!「[^，,。：,:；;！!？?]*?[，,。：,:；;！!？?]?」))'
+        )
         sentences = sentence_spliter.split(data['article'])
         masked_rate = 0
         fail_count = 0
@@ -93,8 +111,11 @@ def mask_sent_by_token_rate(
             if mask_rate['max'] > masked_rate > mask_rate['min']:
                 break
             choose_id = choice(range(len(sentences)))
-            if (re.match(r'[^，,。：,:；;！!？?]', sentences[choose_id]) and
-                    sentences[choose_id] != '[MASK_S]'):
+            if (
+                re.match(r'[^「」，,。：,:；;！!？?]', sentences[choose_id]) and
+                sentences[choose_id] != '[MASK_S]' and
+                sentences[choose_id] != ''
+            ):
                 sent_mask_rate = sentences_len[choose_id] / article_len
                 if masked_rate + sent_mask_rate > mask_rate['max']:
                     fail_count += 1
@@ -126,12 +147,21 @@ def mask_sent_by_sent_rate(
     mask_token_rate_list = []
     for data in tqdm(dataset):
         # Split sentences while reserve punctuation.
-        sentence_spliter = re.compile(r'([，,。：,:；;！!？?])')
+        sentence_spliter = re.compile(
+            # 抓不在 `」` 左邊的標點符號.
+            r'([，,。：,:；;！!？?](?!」)'
+            # 抓引號內包含標點符號,且有標點符號不在 `」` 左邊的 `「`.
+            + r'|「(?![^，,。：,:；;！!？?]*?[，,。：,:；;！!？?]?」)'
+            # 抓引號內包含標點符號,且有標點符號不在 `」` 左邊的 `」`.(若`」` 左邊有 `!`，
+            # 抓出來會是 `!」`,若沒有標點符號抓出來會是 `」`.)
+            + r'|[，,。：,:；;！!？?]?」'
+            + r'(?<!「[^，,。：,:；;！!？?]*?[，,。：,:；;！!？?]?」))'
+        )
         sentences = sentence_spliter.split(data['article'])
 
         # Get list of sentences without punctuation.
         filtered_sentences = list(filter(
-            lambda s: not re.match(r'([，,。：,:；;！!？?\s]|^$)', s),
+            lambda s: not re.match(r'([「」，,。：,:；;！!？?\s]|^$)', s),
             sentences
         ))
 
@@ -164,6 +194,51 @@ def mask_sent_by_sent_rate(
     return result, sum(mask_token_rate_list) / len(mask_token_rate_list)
 
 
+def mask_tokens(
+    dataset,
+    tokenizer: PreTrainedTokenizerFast,
+    mask_rate: float,
+):
+    result = []
+    for data in tqdm(dataset):
+        # Tokenize article.
+        tokenized_article = tokenizer.tokenize(data['article'])
+
+        # Remove special tag or punctuation.
+        filtered_article = list(
+            filter(
+                lambda token: re.match(r'[\w]+', token),
+                tokenized_article
+            )
+        )
+
+        # Count how many mask should be masked.
+        mask_token_num = int(len(filtered_article) * mask_rate)
+
+        # Choose token to mask.
+        choosed_id = sample(range(len(filtered_article)), mask_token_num)
+
+        # Mask tokens.
+        for index in choosed_id:
+            filtered_article[index] = '[MASK_W]'
+
+        # Infill special tag or punctuation which remove before.
+        for index, word in enumerate(tokenized_article):
+            if re.match(r'([^\w]+|^<(per|loc|org|en|num|unk)\d*>)', word):
+                filtered_article = filtered_article[:index] + \
+                    [word] + filtered_article[index:]
+
+        data['masked_article'] = ''.join(
+            ['[ARTICLE]'] + filtered_article + ['[SEP]'])
+
+        # Delete answer column.
+        del data['answer']
+        result.append(data)
+
+    # Return masked articles and avg_masked_rate.
+    return result, mask_rate
+
+
 def re_generate_fail_data(
     fail_articles: List[str],
     infr_function: Callable,
@@ -185,6 +260,7 @@ def re_generate_fail_data(
 
         # Reset `prompts` to store still fail articles for next iteration.
         prompts = []
+
         # Counting each type of error log.
         err_counter = Counter()
         for index, article in zip(
@@ -278,6 +354,12 @@ def create_MN_data(
             tokenizer=tokenizer,
             mask_rate=mask_rate,
         )
+    elif mask_strategy == 'Token':
+        machine_data, avg_masked_rate = mask_tokens(
+            dataset=machine_data,
+            tokenizer=tokenizer,
+            mask_rate=mask_rate,
+        )
     else:
         raise Exception('Mask strategy not exist.')
 
@@ -341,8 +423,8 @@ def mask_dataset(
     tokenizer_name: str,
     max_length: int,
     document_mask_p: float = 0.03,
-    sentence_mask_p: float = 0.045,
-    word_mask_p: float = 0.05,
+    sentence_mask_p: float = 0.1,
+    word_mask_p: float = 0.1,
     ngram_mask_p: float = 0.5,
     min_ngram_length: int = 2,
     max_ngram_length: int = 6,

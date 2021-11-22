@@ -9,11 +9,11 @@ if __name__ == '__main__':
         tokenizer_name='chinese_tokenizer_big',
         max_seq_len=512,
         k=40,
-        data_num=50000,
+        data_num=20,
         mask_strategy='Sentence_sent_rate',
-        use_test_data=False,
+        use_test_data=True,
         batch_size=32,
         # mask_rate={'max': 0.35, 'min': 0.25},
-        mask_rate=0.35,
+        mask_rate=0.20,
     )
     pickle.dump(MN_dataset, open('test.pkl', 'wb'))

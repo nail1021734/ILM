@@ -13,6 +13,7 @@ gputil = "*"
 hyperopt = "*"
 isort = "*"
 flake8 = "*"
+regex = "*"
 
 [dev-packages]
 

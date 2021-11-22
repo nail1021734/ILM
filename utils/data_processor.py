@@ -29,6 +29,11 @@ def load_MLM_data_v3():
         os.path.join(ROOT_PATH, 'dataset_script', 'MLM_dataset_v3.py'))
 
 
+def load_MLM_data_v4():
+    return load_dataset(
+        os.path.join(ROOT_PATH, 'dataset_script', 'MLM_dataset_v4.py'))
+
+
 def load_MLM_NT_data():
     return load_dataset(
         os.path.join(ROOT_PATH, 'dataset_script', 'MLM_dataset_NT.py'))
@@ -52,7 +57,12 @@ def load_tokenizer(tokenizer_name, max_length):
         'eos_token': '[END]',
         'mask_token': '[MASK_W]',
         'unk_token': '<unk>',
-        'additional_special_tokens': ['[ANS]', '[MASK_S]', '[MASK_D]']
+        'additional_special_tokens': [
+            '[ANS]',
+            '[MASK_S]',
+            '[MASK_D]',
+            '[MASK_N]',
+        ]
     })
     tokenizer.model_max_length = max_length
 
@@ -97,6 +107,8 @@ def load_dataset_by_name(dataset_name: str):
         return load_MLM_data_v2()
     elif dataset_name == 'MLM_dataset_v3':
         return load_MLM_data_v3()
+    elif dataset_name == 'MLM_dataset_v4':
+        return load_MLM_data_v4()
     elif dataset_name == 'LM_NT_data':
         return load_LM_NT_data()
     elif dataset_name == 'MLM_NT_data':
