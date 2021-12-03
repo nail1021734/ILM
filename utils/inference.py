@@ -73,6 +73,8 @@ def sampling(
         pad_token_id=tokenizer.pad_token_id,
     )
 
+    # Remove padding between sep and answer.
+    # Truncate token behind first `[END]`.
     clear_articles = clear_samping_result(
         sampling_result=result,
         padding_id=tokenizer.pad_token_id,

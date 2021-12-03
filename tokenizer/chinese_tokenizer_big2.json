@@ -956,7 +956,11 @@
         "type": "Whitespace"
     },
     "post_processor": null,
-    "decoder": null,
+    "decoder": {
+        "type": "ByteLevel",
+        "add_prefix_space": true,
+        "trim_offsets": true
+    },
     "model": {
         "type": "BPE",
         "dropout": null,

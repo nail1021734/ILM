@@ -45,6 +45,7 @@ def perplexity(
             shift_labels.view(-1)
         )
         total_perplex += math.exp(loss.item())
+
     return total_perplex / len(data_loader.dataset)
 
 

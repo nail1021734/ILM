@@ -9,21 +9,21 @@ logger = datasets.logging.get_logger(__name__)
 
 _DESCRIPTION = """
 Collect Taiwan news from about 10 news media.
-和v3比起來增加各項機率，並且各種MASK方法用不同token表示
-(包含n-gram level和word level也用不同mask token)
+和v4比起來減少各項機率，此資料集用來驗證使用不同mask比例的訓練資料，訓練結果會不會改善。
+
 產生資料時使用的設定如下:
 - `document_mask_p`: 0.03
-- `sentence_mask_p`: 0.1
-- `word_mask_p`: 0.1
+- `sentence_mask_p`: 0.045
+- `word_mask_p`: 0.05
 - `ngram_mask_p`: 0.5
 - `min_ngram_length`: 2
 - `max_ngram_length`: 6
 
-大約mask總文章量的20%
+大約mask總文章量的10%
 """
 
-_TRAIN_PATH = os.path.join(ROOT_PATH, 'dataset', 'mlm_train4.pk')
-_TEST_PATH = os.path.join(ROOT_PATH, 'dataset', 'mlm_test4.pk')
+_TRAIN_PATH = os.path.join(ROOT_PATH, 'dataset', 'mlm_train5.pk')
+_TEST_PATH = os.path.join(ROOT_PATH, 'dataset', 'mlm_test5.pk')
 
 COMPANY_DICT = {
     1: 'chinatimes',
@@ -54,9 +54,9 @@ class MLMDataset(datasets.GeneratorBasedBuilder):
     r"""Collect Taiwan news from about 10 news media."""
     BUILDER_CONFIG = [
         MLMConfig(
-            name='mlm_news_text4',
+            name='mlm_news_text5',
             version=datasets.Version('1.0.0', ''),
-            description='mlm news text4'
+            description='mlm news text5'
         ),
     ]
 

@@ -11,10 +11,10 @@ from utils.data_processor import load_dataset_by_name
 
 def build_BPE_tokenizer(tokenizer_name: str, dataset: List[str], vocab_size: int):
     # Set tokenizer parameter.
-    tokenizer = Tokenizer(models.BPE())
+    tokenizer = Tokenizer(models.BPE(unk_token='<unk>'))
     tokenizer.normalizer = normalizers.NFKC()
     tokenizer.pre_tokenizer = pre_tokenizers.Whitespace()
-    tokenizer.decoders = decoders.ByteLevel()
+    tokenizer.decoder = decoders.ByteLevel()
 
     # Set special tokens.
     special_tokens_list = ["[PAD]", "<unk>", "[CLS]", "[SEP]", "[MASK]",
@@ -63,9 +63,9 @@ def build_BPE_tokenizer(tokenizer_name: str, dataset: List[str], vocab_size: int
 
 
 if __name__ == '__main__':
-    dataset = load_dataset_by_name('LM_NT_data')
+    dataset = load_dataset_by_name('Taiwan_news_dataset')
     build_BPE_tokenizer(
-        tokenizer_name='chinese_tokenizer_big_NT',
+        tokenizer_name='chinese_tokenizer_big2',
         dataset=dataset,
         vocab_size=50000,
     )

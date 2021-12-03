@@ -9,8 +9,8 @@ if __name__ == '__main__':
         tokenizer_name='chinese_tokenizer_big',
         save_ckpt_step=80000,
         log_step=500,
-        exp_name='MLM_exp12',
-        dataset_name='MLM_dataset_v4',
+        exp_name='MLM_exp13',
+        dataset_name='MLM_dataset_v5',
         # from_pretrained_model='checkpoint/MLM_exp10/checkpoint-4086331.pt',
 
         # Hyperparameters.
