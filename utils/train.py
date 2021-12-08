@@ -144,8 +144,10 @@ def train(
         optim_group_params,
         lr=config.lr,
     )
-    if config.optimizer_path:
-        optimizer.load_state_dict(torch.load(config.optimizer_path))
+
+    # 如果不是要finetune是要繼續訓練才要打開以下註解把optimizer load回來.
+    # if config.optimizer_path:
+    #     optimizer.load_state_dict(torch.load(config.optimizer_path))
 
     warm_up_function = create_warm_up_function(
         config=config,

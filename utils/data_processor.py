@@ -39,6 +39,16 @@ def load_MLM_data_v5():
         os.path.join(ROOT_PATH, 'dataset_script', 'MLM_dataset_v5.py'))
 
 
+def load_MLM_data_v6():
+    return load_dataset(
+        os.path.join(ROOT_PATH, 'dataset_script', 'MLM_dataset_v6.py'))
+
+
+def load_MLM_data_token():
+    return load_dataset(
+        os.path.join(ROOT_PATH, 'dataset_script', 'MLM_dataset_token.py'))
+
+
 def load_MLM_NT_data():
     return load_dataset(
         os.path.join(ROOT_PATH, 'dataset_script', 'MLM_dataset_NT.py'))
@@ -116,6 +126,10 @@ def load_dataset_by_name(dataset_name: str):
         return load_MLM_data_v4()
     elif dataset_name == 'MLM_dataset_v5':
         return load_MLM_data_v5()
+    elif dataset_name == 'MLM_dataset_v6':
+        return load_MLM_data_v6()
+    elif dataset_name == 'MLM_dataset_token':
+        return load_MLM_data_token()
     elif dataset_name == 'LM_NT_data':
         return load_LM_NT_data()
     elif dataset_name == 'MLM_NT_data':
