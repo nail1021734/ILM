@@ -56,22 +56,36 @@ def load_MLM_NT_data():
 
 def load_LM_NT_data():
     return load_dataset(
-        os.path.join(ROOT_PATH, 'dataset_script', 'Taiwan_news_dataset_notag.py'))
+        os.path.join(ROOT_PATH, 'dataset_script',
+                     'Taiwan_news_dataset_notag.py'))
+
+
+def load_ILM_merged_data():
+    return load_dataset(
+        os.path.join(ROOT_PATH, 'dataset_script', 'MLM_dataset_v7.py'))
+
+
+def load_merged_data():
+    return load_dataset(
+        os.path.join(ROOT_PATH, 'dataset_script', 'merged_data.py'))
 
 
 def load_tokenizer(tokenizer_name, max_length):
     tokenizer = PreTrainedTokenizerFast(tokenizer_file=os.path.join(
-        ROOT_PATH,
-        'tokenizer',
-        f'{tokenizer_name}.json'
-    ))
+        ROOT_PATH, 'tokenizer', f'{tokenizer_name}.json'))
     tokenizer.add_special_tokens({
-        'pad_token': '[PAD]',
-        'bos_token': '[TITLE]',
-        'sep_token': '[ARTICLE]',
-        'eos_token': '[END]',
-        'mask_token': '[MASK_W]',
-        'unk_token': '<unk>',
+        'pad_token':
+        '[PAD]',
+        'bos_token':
+        '[TITLE]',
+        'sep_token':
+        '[ARTICLE]',
+        'eos_token':
+        '[END]',
+        'mask_token':
+        '[MASK_W]',
+        'unk_token':
+        '<unk>',
         'additional_special_tokens': [
             '[ANS]',
             '[MASK_S]',
@@ -92,14 +106,16 @@ def callate_fn_creater(tokenizer):
             ("[ARTICLE]", tokenizer.get_vocab()["[ARTICLE]"]),
             ("[SEP]", tokenizer.get_vocab()["[SEP]"]),
             ("[END]", tokenizer.get_vocab()["[END]"]),
-        ]
-    )
+        ])
 
     def tokenizer_function(data):
         masked_articles = [i["masked_article"] for i in data]
         answers = [i["answer"] for i in data]
-        tokenized_result = tokenizer(
-            masked_articles, answers, truncation=True, padding=True, return_tensors='pt')
+        tokenized_result = tokenizer(masked_articles,
+                                     answers,
+                                     truncation=True,
+                                     padding=True,
+                                     return_tensors='pt')
 
         sep_id = tokenizer.get_vocab()['[SEP]']
         input_tensor = tokenized_result['input_ids']
@@ -110,6 +126,7 @@ def callate_fn_creater(tokenizer):
         del tokenized_result['token_type_ids']
 
         return tokenized_result
+
     return tokenizer_function
 
 
@@ -134,6 +151,10 @@ def load_dataset_by_name(dataset_name: str):
         return load_LM_NT_data()
     elif dataset_name == 'MLM_NT_data':
         return load_MLM_NT_data()
+    elif dataset_name == 'merged_data':
+        return load_merged_data()
+    elif dataset_name == 'load_ILM_merged_data':
+        return load_ILM_merged_data()
     else:
         raise ValueError(f'Dataset name not exist {dataset_name}')
 
@@ -150,24 +171,19 @@ def create_data_loader(
     datasets = load_dataset_by_name(dataset_name=dataset_name)
 
     # Load tokenizer.
-    tokenizer = load_tokenizer(
-        tokenizer_name=tokenizer_name,
-        max_length=max_length
-    )
+    tokenizer = load_tokenizer(tokenizer_name=tokenizer_name,
+                               max_length=max_length)
     if testing:
         dataset = datasets['test']
     else:
         dataset = datasets['train']
     # Create data loader.
-    data_loader = DataLoader(
-        dataset=dataset,
-        batch_size=batch_size,
-        shuffle=shuffle,
-        num_workers=4,
-        collate_fn=callate_fn_creater(
-            tokenizer=tokenizer,
-        )
-    )
+    data_loader = DataLoader(dataset=dataset,
+                             batch_size=batch_size,
+                             shuffle=shuffle,
+                             num_workers=4,
+                             collate_fn=callate_fn_creater(
+                                 tokenizer=tokenizer, ))
 
     return data_loader
 

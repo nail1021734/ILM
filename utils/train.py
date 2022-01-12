@@ -17,22 +17,15 @@ from utils.data_processor import create_data_loader
 def save_model(model, optimizer, save_path, iteration):
     if not os.path.exists(save_path):
         os.makedirs(save_path)
-    torch.save(
-        model.state_dict(),
-        os.path.join(save_path, f'checkpoint-{iteration}.pt')
-    )
-    torch.save(
-        optimizer.state_dict(),
-        os.path.join(save_path, f'optimizer-{iteration}.pt')
-    )
+    torch.save(model.state_dict(),
+               os.path.join(save_path, f'checkpoint-{iteration}.pt'))
+    torch.save(optimizer.state_dict(),
+               os.path.join(save_path, f'optimizer-{iteration}.pt'))
 
 
-def create_warm_up_function(
-    config: Dict,
-):
-    total_step = config.epoch_num * (config.dataset_size // (
-        config.batch_size * config.accumulate_step)
-    )
+def create_warm_up_function(config: Dict, ):
+    total_step = config.epoch_num * (
+        config.dataset_size // (config.batch_size * config.accumulate_step))
 
     warm_up_step = int(total_step * config.warm_up_step_rate)
 
@@ -40,6 +33,7 @@ def create_warm_up_function(
         m = (step + 1) / \
             warm_up_step if step < warm_up_step else 1
         return m
+
     return warm_up_function
 
 
@@ -49,16 +43,14 @@ def save_config(
 ):
     if not os.path.exists(config['save_path']):
         os.makedirs(config['save_path'])
-    json.dump(config, open(
-        os.path.join(config['save_path'], 'config.json'), 'w'))
-    json.dump(model_config, open(
-        os.path.join(config['save_path'], 'model_config.json'), 'w'))
+    json.dump(config,
+              open(os.path.join(config['save_path'], 'config.json'), 'w'))
+    json.dump(
+        model_config,
+        open(os.path.join(config['save_path'], 'model_config.json'), 'w'))
 
 
-def train(
-    config: Dict,
-    model_config: Dict
-):
+def train(config: Dict, model_config: Dict):
     r'''Use to training ILM model.
 
     Parameters
@@ -111,9 +103,7 @@ def train(
     )
 
     # Initial model.
-    model = GPT2LMHeadModel(
-        GPT2Config.from_dict(model_config)
-    )
+    model = GPT2LMHeadModel(GPT2Config.from_dict(model_config))
     model = model.to(device)
 
     # Load from pretrained.
@@ -128,14 +118,16 @@ def train(
                 param for name, param in model.named_parameters()
                 if not any(nd in name for nd in no_decay)
             ],
-            'weight_decay': config.weight_decay,
+            'weight_decay':
+            config.weight_decay,
         },
         {
             'params': [
                 param for name, param in model.named_parameters()
                 if any(nd in name for nd in no_decay)
             ],
-            'weight_decay': 0.0,
+            'weight_decay':
+            0.0,
         },
     ]
 
@@ -146,32 +138,25 @@ def train(
     )
 
     # 如果不是要finetune是要繼續訓練才要打開以下註解把optimizer load回來.
-    # if config.optimizer_path:
-    #     optimizer.load_state_dict(torch.load(config.optimizer_path))
+    if config.optimizer_path:
+        optimizer.load_state_dict(torch.load(config.optimizer_path))
 
-    warm_up_function = create_warm_up_function(
-        config=config,
-    )
-    scheduler = torch.optim.lr_scheduler.LambdaLR(
-        optimizer, lr_lambda=warm_up_function)
+    warm_up_function = create_warm_up_function(config=config, )
+    scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer,
+                                                  lr_lambda=warm_up_function)
 
     criterion = CrossEntropyLoss(ignore_index=config.padding_idx)
     iteration = 1
     total_loss = 0
     for epoch in range(config.epoch_num):
-        epoch_iter = tqdm(
-            data_loader,
-            desc=f'epoch: {epoch}, loss: {0:.6f}'
-        )
+        epoch_iter = tqdm(data_loader, desc=f'epoch: {epoch}, loss: {0:.6f}')
 
         for batch_inputs in epoch_iter:
             batch_inputs['input_ids'] = batch_inputs['input_ids'].to(device)
             batch_inputs['attention_mask'] = batch_inputs['attention_mask'].to(
                 device)
-            outputs = model(
-                input_ids=batch_inputs['input_ids'],
-                attention_mask=batch_inputs['attention_mask']
-            )
+            outputs = model(input_ids=batch_inputs['input_ids'],
+                            attention_mask=batch_inputs['attention_mask'])
 
             # Calaulate loss.
             shift_logits = outputs.logits[..., :-1, :].contiguous()
@@ -181,21 +166,18 @@ def train(
             padding_id = torch.zeros_like(mask) + config.padding_idx
             padding_id = padding_id * (mask == False)
             padding_id = padding_id.to(device)
-            shift_labels = batch_inputs['input_ids'][..., 1:].contiguous(
-            ) * mask + padding_id
+            shift_labels = batch_inputs['input_ids'][
+                ..., 1:].contiguous() * mask + padding_id
 
             # Flatten the tokens.
-            loss = criterion(
-                shift_logits.view(-1, shift_logits.size(-1)),
-                shift_labels.view(-1)
-            )
+            loss = criterion(shift_logits.view(-1, shift_logits.size(-1)),
+                             shift_labels.view(-1))
 
             total_loss += loss.item()
 
             # Modify progress bar.
             epoch_iter.set_description(
-                f'epoch: {epoch}, loss: {loss.item():.6f}'
-            )
+                f'epoch: {epoch}, loss: {loss.item():.6f}')
             loss = loss / config.accumulate_step
             loss.backward()
 
@@ -212,16 +194,12 @@ def train(
                 total_loss = 0
 
             if iteration % config.save_ckpt_step == 0:
-                save_model(
-                    model=model,
-                    optimizer=optimizer,
-                    save_path=config.save_path,
-                    iteration=iteration
-                )
+                save_model(model=model,
+                           optimizer=optimizer,
+                           save_path=config.save_path,
+                           iteration=iteration)
             iteration += 1
-    save_model(
-        model=model,
-        optimizer=optimizer,
-        save_path=config.save_path,
-        iteration=iteration
-    )
+    save_model(model=model,
+               optimizer=optimizer,
+               save_path=config.save_path,
+               iteration=iteration)

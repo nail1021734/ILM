@@ -13,7 +13,7 @@ from collections import Counter
 
 
 def mask_article(
-    tokenizer,
+    tokenizer: PreTrainedTokenizerFast,
     article: str,
     document_mask_p: float,
     sentence_mask_p: float,
@@ -29,8 +29,7 @@ def mask_article(
         + r'|「(?![^，,。：,:；;！!？?]*?[，,。：,:；;！!？?]?」)'
         # 抓引號內包含標點符號,且有標點符號不在 `」` 左邊的 `」`.(若`」` 左邊有 `!`，
         # 抓出來會是 `!」`,若沒有標點符號抓出來會是 `」`.)
-        + r'|(?<!「[^，,。：,:；;！!？?]*?[，,。：,:；;！!？?]?)[，,。：,:；;！!？?]?」)'
-    )
+        + r'|(?<!「[^，,。：,:；;！!？?]*?[，,。：,:；;！!？?]?)[，,。：,:；;！!？?]?」)')
     article = ''.join(tokenizer.tokenize(article)[:tokenizer.model_max_length])
     mask_w_token = tokenizer.mask_token
     mask_sent_token = '[MASK_S]'
@@ -58,13 +57,10 @@ def mask_article(
                 while word_idx < len(tokenized_sent):
                     if random() < word_mask_p:
                         if random() < ngram_mask_p:
-                            n = randrange(
-                                min_ngram_length,
-                                max_ngram_length
-                            )
+                            n = randrange(min_ngram_length, max_ngram_length)
                             masked_sentences.append(mask_n_gram_token)
-                            answer.append(
-                                ''.join(tokenized_sent[word_idx: word_idx+n]))
+                            answer.append(''.join(
+                                tokenized_sent[word_idx:word_idx + n]))
                             word_idx += n
                             continue
                         else:
@@ -73,10 +69,8 @@ def mask_article(
                     else:
                         masked_sentences.append(tokenized_sent[word_idx])
                     word_idx += 1
-        return (
-            ''.join(masked_sentences),
-            ans_end_token.join(answer) + ans_end_token
-        )
+        return (''.join(masked_sentences),
+                ans_end_token.join(answer) + ans_end_token)
 
 
 def mask_sent_by_token_rate(
@@ -98,8 +92,7 @@ def mask_sent_by_token_rate(
             + r'|「(?![^，,。：,:；;！!？?]*?[，,。：,:；;！!？?]?」)'
             # 抓引號內包含標點符號,且有標點符號不在 `」` 左邊的 `」`.(若`」` 左邊有 `!`，
             # 抓出來會是 `!」`,若沒有標點符號抓出來會是 `」`.)
-            + r'|(?<!「[^，,。：,:；;！!？?]*?[，,。：,:；;！!？?]?)[，,。：,:；;！!？?]?」)'
-        )
+            + r'|(?<!「[^，,。：,:；;！!？?]*?[，,。：,:；;！!？?]?)[，,。：,:；;！!？?]?」)')
         sentences = sentence_spliter.split(data['article'])
         masked_rate = 0
         fail_count = 0
@@ -109,11 +102,9 @@ def mask_sent_by_token_rate(
             if mask_rate['max'] > masked_rate > mask_rate['min']:
                 break
             choose_id = choice(range(len(sentences)))
-            if (
-                re.match(r'[^「」，,。：,:；;！!？?]', sentences[choose_id]) and
-                sentences[choose_id] != '[MASK_S]' and
-                sentences[choose_id] != ''
-            ):
+            if (re.match(r'[^「」，,。：,:；;！!？?]', sentences[choose_id])
+                    and sentences[choose_id] != '[MASK_S]'
+                    and sentences[choose_id] != ''):
                 sent_mask_rate = sentences_len[choose_id] / article_len
                 if masked_rate + sent_mask_rate > mask_rate['max']:
                     fail_count += 1
@@ -123,8 +114,8 @@ def mask_sent_by_token_rate(
                 sentences[choose_id] = '[MASK_S]'
                 masked_rate += sent_mask_rate
         if max_fail_count >= fail_count:
-            data['masked_article'] = ''.join(
-                ['[ARTICLE]'] + sentences + ['[SEP]'])
+            data['masked_article'] = ''.join(['[ARTICLE]'] + sentences +
+                                             ['[SEP]'])
             del data['answer']
             result.append(data)
             mask_token_rate.append(masked_rate)
@@ -152,15 +143,13 @@ def mask_sent_by_sent_rate(
             + r'|「(?![^，,。：,:；;！!？?]*?[，,。：,:；;！!？?]?」)'
             # 抓引號內包含標點符號,且有標點符號不在 `」` 左邊的 `」`.(若`」` 左邊有 `!`，
             # 抓出來會是 `!」`,若沒有標點符號抓出來會是 `」`.)
-            + r'|(?<!「[^，,。：,:；;！!？?]*?[，,。：,:；;！!？?]?)[，,。：,:；;！!？?]?」)'
-        )
+            + r'|(?<!「[^，,。：,:；;！!？?]*?[，,。：,:；;！!？?]?)[，,。：,:；;！!？?]?」)')
         sentences = sentence_spliter.split(data['article'])
 
         # Get list of sentences without punctuation.
-        filtered_sentences = list(filter(
-            lambda s: not re.match(r'([「」，,。：,:；;！!？?\s]|^$)', s),
-            sentences
-        ))
+        filtered_sentences = list(
+            filter(lambda s: not re.match(r'([「」，,。：,:；;！!？?\s]|^$)', s),
+                   sentences))
 
         # Calculate how many sentence need to be masked.
         mask_sent_num = int(len(filtered_sentences) * mask_rate)
@@ -175,14 +164,13 @@ def mask_sent_by_sent_rate(
         masked_token_rate = 0
         for i in choose_ids:
             choosed_sent = filtered_sentences[i]
-            masked_token_rate += len(tokenizer.tokenize(choosed_sent)
-                                     ) / article_len
+            masked_token_rate += len(
+                tokenizer.tokenize(choosed_sent)) / article_len
             sentences[sentences.index(choosed_sent)] = '[MASK_S]'
         mask_token_rate_list.append(masked_token_rate)
 
         # Add bos token and sep token.
-        data['masked_article'] = ''.join(
-            ['[ARTICLE]'] + sentences + ['[SEP]'])
+        data['masked_article'] = ''.join(['[ARTICLE]'] + sentences + ['[SEP]'])
 
         # Delete answer column.
         del data['answer']
@@ -203,11 +191,7 @@ def mask_tokens(
 
         # Remove special tag or punctuation.
         filtered_article = list(
-            filter(
-                lambda token: re.match(r'[\w]+', token),
-                tokenized_article
-            )
-        )
+            filter(lambda token: re.match(r'[\w]+', token), tokenized_article))
 
         # Count how many mask should be masked.
         mask_token_num = int(len(filtered_article) * mask_rate)
@@ -225,8 +209,8 @@ def mask_tokens(
                 filtered_article = filtered_article[:index] + \
                     [word] + filtered_article[index:]
 
-        data['masked_article'] = ''.join(
-            ['[ARTICLE]'] + filtered_article + ['[SEP]'])
+        data['masked_article'] = ''.join(['[ARTICLE]'] + filtered_article +
+                                         ['[SEP]'])
 
         # Delete answer column.
         del data['answer']
@@ -260,10 +244,7 @@ def re_generate_fail_data(
 
         # Counting each type of error log.
         err_counter = Counter()
-        for index, article in zip(
-            deepcopy(re_generated_id),
-            infr_result
-        ):
+        for index, article in zip(deepcopy(re_generated_id), infr_result):
             try:
                 # Format article to check whether article format correct.
                 formated_article = format_article(article)
@@ -281,8 +262,8 @@ def re_generate_fail_data(
 
     # Print amount of fail article.
     if len(re_generated_id) > 0:
-        print(f'{len(re_generated_id)} articles still failed'
-              + f' after try {max_fail_times} times.')
+        print(f'{len(re_generated_id)} articles still failed' +
+              f' after try {max_fail_times} times.')
 
     return regenerated_articles
 
@@ -303,15 +284,11 @@ def create_MN_data(
     batch_size: int = 8,
 ):
     # Load dataset.
-    dataset = load_dataset_by_name(
-        dataset_name=dataset_name
-    )
+    dataset = load_dataset_by_name(dataset_name=dataset_name)
 
     # Load tokenizer.
-    tokenizer = load_tokenizer(
-        tokenizer_name=tokenizer_name,
-        max_length=max_seq_len
-    )
+    tokenizer = load_tokenizer(tokenizer_name=tokenizer_name,
+                               max_length=max_seq_len)
 
     # Select specify dataset.
     if use_test_data:
@@ -328,9 +305,9 @@ def create_MN_data(
     dataset = data
 
     # Split human article and machine article.
-    dataset = dataset[:data_num*2]
-    human_data = dataset[:len(dataset)//2]
-    machine_data = dataset[len(dataset)//2:]
+    dataset = dataset[:data_num * 2]
+    human_data = dataset[:len(dataset) // 2]
+    machine_data = dataset[len(dataset) // 2:]
 
     # Adjust format.
     for data in human_data:
@@ -363,20 +340,17 @@ def create_MN_data(
     print(f'Average mask token rate: {avg_masked_rate}')
 
     # Create partial inference function.
-    partial_infr_func = partial(
-        inference,
-        ckpt_path=ckpt_path,
-        tokenizer_name=tokenizer_name,
-        max_seq_len=max_seq_len,
-        p=p,
-        k=k,
-        batch_size=batch_size
-    )
+    partial_infr_func = partial(inference,
+                                ckpt_path=ckpt_path,
+                                tokenizer_name=tokenizer_name,
+                                max_seq_len=max_seq_len,
+                                p=p,
+                                k=k,
+                                batch_size=batch_size)
 
     # Inference machine data.
     infr_result = partial_infr_func(
-        prompts=[i['masked_article'] for i in machine_data],
-    )
+        prompts=[i['masked_article'] for i in machine_data], )
 
     # Align `infr_result` with machine dataset.
     for index, data in enumerate(machine_data):
@@ -427,10 +401,7 @@ def mask_dataset(
     max_ngram_length: int = 6,
 ):
     # Load tokenizer.
-    tokenizer = load_tokenizer(
-        tokenizer_name,
-        max_length=max_length
-    )
+    tokenizer = load_tokenizer(tokenizer_name, max_length=max_length)
     # Load dataset.
     dataset = load_dataset_by_name(dataset_name=dataset_name)
     # Mask training data.
